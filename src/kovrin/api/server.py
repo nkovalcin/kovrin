@@ -294,11 +294,20 @@ class PipelineManager:
 
 # ─── App ─────────────────────────────────────────────────────
 
-manager = PipelineManager()
+manager: PipelineManager | None = None
+_init_error: str | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global manager, _init_error
+    try:
+        manager = PipelineManager()
+        print("[kovrin] PipelineManager initialized successfully")
+    except Exception as e:
+        _init_error = f"{type(e).__name__}: {e}"
+        print(f"[kovrin] PipelineManager init FAILED: {_init_error}")
+        print("[kovrin] Server running in degraded mode — core endpoints will return 503")
     yield
 
 
@@ -326,22 +335,48 @@ except ImportError:
     pass
 
 
-# ─── REST Endpoints ──────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────
+
+def _require_manager() -> PipelineManager:
+    """Return the manager or raise 503 if not initialized."""
+    if manager is None:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=503,
+            detail=f"Kovrin API not ready. Init error: {_init_error or 'still starting'}",
+        )
+    return manager
+
+
+# ─── Health & Status Endpoints ────────────────────────────────
+
+@app.get("/api/health")
+async def health_check() -> dict:
+    """Lightweight health check — always responds, even in degraded mode."""
+    return {
+        "status": "ok" if manager is not None else "degraded",
+        "version": "2.0.0-alpha",
+        "init_error": _init_error,
+    }
+
 
 @app.get("/api/status")
 async def get_status() -> StatusResponse:
-    return manager.status
+    m = _require_manager()
+    return m.status
 
 
 @app.post("/api/run")
 async def run_pipeline(request: RunRequest) -> RunResponse:
-    intent_id = await manager.start_pipeline(request)
+    m = _require_manager()
+    intent_id = await m.start_pipeline(request)
     return RunResponse(intent_id=intent_id, status="running")
 
 
 @app.get("/api/traces/{intent_id}")
 async def get_traces(intent_id: str) -> dict:
-    result = manager.get_result(intent_id)
+    m = _require_manager()
+    result = m.get_result(intent_id)
     if not result:
         return {"error": "Pipeline not found or still running", "intent_id": intent_id}
     return {
@@ -353,7 +388,8 @@ async def get_traces(intent_id: str) -> dict:
 
 @app.get("/api/graph/{intent_id}")
 async def get_graph(intent_id: str) -> dict:
-    result = manager.get_result(intent_id)
+    m = _require_manager()
+    result = m.get_result(intent_id)
     if not result:
         return {"error": "Pipeline not found or still running", "intent_id": intent_id}
     return {
@@ -364,7 +400,8 @@ async def get_graph(intent_id: str) -> dict:
 
 @app.get("/api/result/{intent_id}")
 async def get_result(intent_id: str) -> dict:
-    result = manager.get_result(intent_id)
+    m = _require_manager()
+    result = m.get_result(intent_id)
     if not result:
         return {"error": "Pipeline not found or still running", "intent_id": intent_id}
     return result.model_dump()
@@ -373,9 +410,10 @@ async def get_result(intent_id: str) -> dict:
 @app.get("/api/pipelines")
 async def list_pipelines(limit: int = 50, offset: int = 0) -> dict:
     """List all pipeline runs from persistent storage."""
+    m = _require_manager()
     try:
-        pipelines = manager._repo.list_pipelines(limit=limit, offset=offset)
-        return {"pipelines": pipelines, "total": manager._repo.pipeline_count}
+        pipelines = m._repo.list_pipelines(limit=limit, offset=offset)
+        return {"pipelines": pipelines, "total": m._repo.pipeline_count}
     except Exception:
         return {"pipelines": [], "total": 0}
 
@@ -383,16 +421,18 @@ async def list_pipelines(limit: int = 50, offset: int = 0) -> dict:
 @app.get("/api/approvals")
 async def get_approvals() -> dict:
     """Get list of pending approval requests."""
+    m = _require_manager()
     return {
-        "approvals": manager.pending_approvals,
-        "total": len(manager.pending_approvals),
+        "approvals": m.pending_approvals,
+        "total": len(m.pending_approvals),
     }
 
 
 @app.post("/api/approve/{intent_id}/{task_id}")
 async def approve_task(intent_id: str, task_id: str, body: ApproveRequest) -> dict:
     """Approve or reject a pending task."""
-    resolved = manager.resolve_approval(intent_id, task_id, body.approved)
+    m = _require_manager()
+    resolved = m.resolve_approval(intent_id, task_id, body.approved)
     if not resolved:
         return {"error": "Approval request not found or already resolved"}
     return {
@@ -407,7 +447,8 @@ async def approve_task(intent_id: str, task_id: str, body: ApproveRequest) -> di
 @app.get("/api/autonomy")
 async def get_autonomy() -> dict:
     """Get current autonomy settings."""
-    s = manager._autonomy_settings
+    m = _require_manager()
+    s = m._autonomy_settings
     return {
         "profile": s.profile.value,
         "override_matrix": s.override_matrix,
@@ -418,13 +459,14 @@ async def get_autonomy() -> dict:
 @app.post("/api/autonomy")
 async def update_autonomy(body: AutonomyUpdateRequest) -> dict:
     """Update autonomy settings. Persists to DB and broadcasts via WS."""
+    m = _require_manager()
     from datetime import datetime, timezone
     settings = AutonomySettings(
         profile=AutonomyProfile(body.profile),
         override_matrix=body.override_matrix,
         updated_at=datetime.now(timezone.utc),
     )
-    manager.update_autonomy_settings(settings)
+    m.update_autonomy_settings(settings)
     return {
         "status": "updated",
         "profile": settings.profile.value,
@@ -438,7 +480,8 @@ async def update_autonomy(body: AutonomyUpdateRequest) -> dict:
 @app.get("/api/replay/{intent_id}")
 async def get_replay(intent_id: str) -> dict:
     """Build a replay session from stored traces with hash chain data."""
-    rows = manager._repo.get_traces_with_hashes(intent_id)
+    m = _require_manager()
+    rows = m._repo.get_traces_with_hashes(intent_id)
     if not rows:
         return {"error": "No traces found for this pipeline", "intent_id": intent_id}
 
@@ -487,7 +530,8 @@ async def get_replay(intent_id: str) -> dict:
 @app.post("/api/replay/{intent_id}/evaluate")
 async def evaluate_counterfactual(intent_id: str, body: CounterfactualEvalRequest) -> dict:
     """Re-evaluate routing decisions with hypothetical autonomy settings."""
-    result = manager.get_result(intent_id)
+    m = _require_manager()
+    result = m.get_result(intent_id)
     if not result:
         return {"error": "Pipeline not found", "intent_id": intent_id}
 
@@ -528,7 +572,8 @@ async def evaluate_counterfactual(intent_id: str, body: CounterfactualEvalReques
 @app.get("/api/prm/{intent_id}")
 async def get_prm_scores(intent_id: str) -> dict:
     """Get PRM (Process Reward Model) scores for a pipeline's tasks."""
-    result = manager.get_result(intent_id)
+    m = _require_manager()
+    result = m.get_result(intent_id)
     if not result:
         return {"error": "Pipeline not found", "intent_id": intent_id}
 
@@ -560,10 +605,11 @@ async def get_prm_scores(intent_id: str) -> dict:
 @app.get("/api/tokens")
 async def get_active_tokens() -> dict:
     """Get active delegation capability tokens."""
-    if not hasattr(manager._kovrin, '_token_authority') or not manager._kovrin._token_authority:
+    m = _require_manager()
+    if not hasattr(m._kovrin, '_token_authority') or not m._kovrin._token_authority:
         return {"tokens": [], "total": 0, "enabled": False}
 
-    tokens = manager._kovrin._token_authority.active_tokens
+    tokens = m._kovrin._token_authority.active_tokens
     return {
         "tokens": [
             {
@@ -591,7 +637,8 @@ async def get_active_tokens() -> dict:
 @app.get("/api/topology/{intent_id}")
 async def get_topology(intent_id: str) -> dict:
     """Get topology recommendation for a pipeline."""
-    result = manager.get_result(intent_id)
+    m = _require_manager()
+    result = m.get_result(intent_id)
     if not result:
         return {"error": "Pipeline not found", "intent_id": intent_id}
 
@@ -621,10 +668,11 @@ async def get_topology(intent_id: str) -> dict:
 @app.get("/api/drift")
 async def get_drift_metrics() -> dict:
     """Get per-agent drift metrics from the watchdog."""
-    if not hasattr(manager._kovrin, '_watchdog') or not manager._kovrin._watchdog:
+    m = _require_manager()
+    if not hasattr(m._kovrin, '_watchdog') or not m._kovrin._watchdog:
         return {"agents": [], "total": 0, "enabled": False}
 
-    tracker = manager._kovrin._watchdog.drift_tracker
+    tracker = m._kovrin._watchdog.drift_tracker
     if not tracker:
         return {"agents": [], "total": 0, "enabled": False}
 
@@ -651,6 +699,10 @@ async def get_drift_metrics() -> dict:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    if manager is None:
+        await websocket.send_json({"type": "error", "message": "Server in degraded mode"})
+        await websocket.close()
+        return
     manager._ws_connections.append(websocket)
     try:
         while True:
