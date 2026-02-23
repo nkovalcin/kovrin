@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+sdist/
+wheels/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment & secrets
+.env
+.env.local
+.env.production
+!.env.example
+
+# Database
+*.db
+*.sqlite3
+
+# Testing & coverage
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+logs/
+*.log
+
+# Node (dashboard)
+node_modules/
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.vite/
+
+# Claude Code session data
+.claude/
+
+# OS files
+Thumbs.db
+ehthumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution / packaging
+*.tar.gz
+*.zip

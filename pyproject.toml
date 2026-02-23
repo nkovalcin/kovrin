@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kovrin"
+version = "2.0.0-alpha"
+description = "Safety-first intent-based AI orchestration framework with constitutional constraints, formal verification, and cryptographic audit trails"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "Norbert Kovalcin", email = "norbert@nkovalcin.com" },
+]
+keywords = [
+    "ai-safety",
+    "ai-agents",
+    "orchestration",
+    "formal-verification",
+    "constitutional-ai",
+    "audit-trail",
+    "multi-agent",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+dependencies = [
+    "anthropic>=0.40.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
+
+[project.urls]
+Homepage = "https://kovrin.ai"
+Documentation = "https://docs.kovrin.dev"
+Repository = "https://github.com/nkovalcin/kovrin"
+Issues = "https://github.com/nkovalcin/kovrin/issues"
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "websockets>=14.0",
+]
+superwork = [
+    "watchdog>=4.0",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "rich>=13.0",
+    "click>=8.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-mock>=3.14",
+    "httpx>=0.28",
+    "mypy>=1.10",
+    "ruff>=0.5",
+]
+all = [
+    "kovrin[api,superwork]",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kovrin"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that require Claude API (deselect with '-m \"not integration\"')",
+    "adversarial: tests that attempt to bypass Layer 0 safety",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "TCH"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
