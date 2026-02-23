@@ -315,6 +315,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount SuperWork router if extras are installed
+try:
+    from kovrin.api.superwork_router import router as superwork_router
+
+    app.include_router(superwork_router)
+except ImportError:
+    pass
+
 
 # ─── REST Endpoints ──────────────────────────────────────────
 

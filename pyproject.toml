@@ -68,6 +68,9 @@ all = [
     "kovrin[api,superwork]",
 ]
 
+[project.scripts]
+kovrin-superwork = "kovrin.superwork.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/kovrin"]
 
