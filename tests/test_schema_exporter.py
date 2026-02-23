@@ -164,13 +164,12 @@ class TestParityValidation:
     """Verify drift detection between Python models and TS file."""
 
     def test_validates_against_existing_ts(self, exporter):
-        """Validation against the hand-written TS file finds known discrepancies."""
+        """Validation against the auto-generated TS file should have zero discrepancies."""
         ts_path = Path(__file__).parent.parent / "dashboard" / "src" / "types" / "kovrin.ts"
         if not ts_path.exists():
             pytest.skip("Dashboard TS file not found")
         issues = exporter.validate_parity(str(ts_path))
-        # We know there are discrepancies
-        assert len(issues) > 0
+        assert issues == [], f"TS file has discrepancies: {issues}"
 
     def test_validates_generated_ts_full_parity(self, exporter):
         """Validation against generated TS should have zero discrepancies."""
@@ -257,8 +256,8 @@ class TestCLI:
         finally:
             Path(path).unlink()
 
-    def test_cli_validate_finds_issues(self):
-        """--validate against hand-written TS exits with code 1."""
+    def test_cli_validate_no_issues(self):
+        """--validate against auto-generated TS exits with code 0."""
         ts_path = Path(__file__).parent.parent / "dashboard" / "src" / "types" / "kovrin.ts"
         if not ts_path.exists():
             pytest.skip("Dashboard TS file not found")
@@ -266,5 +265,4 @@ class TestCLI:
             [sys.executable, "-m", "kovrin.schema.exporter", "--validate", str(ts_path)],
             capture_output=True, text=True,
         )
-        assert result.returncode == 1
-        assert "discrepancies" in result.stdout
+        assert result.returncode == 0

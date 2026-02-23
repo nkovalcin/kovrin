@@ -12,7 +12,7 @@ import anthropic
 
 
 class AgentRegistry:
-    """Registry of available specialized agents."""
+    """Central registry for specialized agents with role and capability lookup."""
 
     def __init__(self, client: anthropic.AsyncAnthropic | None = None):
         self._agents: dict[str, Agent] = {}

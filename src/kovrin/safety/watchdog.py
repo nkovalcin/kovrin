@@ -391,14 +391,17 @@ class WatchdogAgent:
 
     @property
     def drift_tracker(self) -> AgentDriftTracker | None:
+        """Returns the agent drift tracker, or None if drift detection is disabled."""
         return self._drift_tracker
 
     @property
     def is_paused(self) -> bool:
+        """Whether the watchdog has paused pipeline execution."""
         return not self._pause_event.is_set()
 
     @property
     def is_killed(self) -> bool:
+        """Whether the watchdog has permanently killed pipeline execution."""
         return self._killed
 
     async def wait_if_paused(self) -> None:

@@ -233,6 +233,7 @@ class ImmutableTraceLog:
 
     @property
     def head_hash(self) -> str:
+        """Returns the SHA-256 hash of the most recent event in the chain."""
         return self._current_hash
 
     def __len__(self) -> int:
