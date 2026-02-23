@@ -1,9 +1,9 @@
 """
-Kovrin SQLite Persistence
+Kovrin Pipeline Persistence
 
-Stores pipeline results and trace events in SQLite for durability
-across server restarts. Uses Python's built-in sqlite3 module
-(no additional dependencies).
+Stores pipeline results and trace events for durability
+across server restarts. Supports SQLite and PostgreSQL
+via the ``kovrin.storage.db`` connection wrapper.
 
 Schema:
 - pipelines: stores ExecutionResult metadata
@@ -11,9 +11,7 @@ Schema:
 """
 
 import json
-import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 
 from kovrin.core.models import (
     AutonomyProfile,
@@ -23,20 +21,21 @@ from kovrin.core.models import (
     SubTask,
     Trace,
 )
+from kovrin.storage.db import connect
 
 
 class PipelineRepository:
-    """SQLite-backed storage for pipeline results and traces."""
+    """Database-backed storage for pipeline results and traces."""
 
-    def __init__(self, db_path: str = "kovrin.db"):
+    def __init__(self, db_url: str = "kovrin.db"):
         """Initialize repository.
 
         Args:
-            db_path: Path to SQLite database file. Use ":memory:" for testing.
+            db_url: Database URL. Use ``postgresql://...`` for PostgreSQL
+                    or a file path / ``:memory:`` for SQLite.
         """
-        self._db_path = db_path
-        self._conn = sqlite3.connect(db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
+        self._db_url = db_url
+        self._conn = connect(db_url)
         self._create_tables()
 
     def _create_tables(self) -> None:
@@ -80,7 +79,7 @@ class PipelineRepository:
                 profile TEXT DEFAULT 'DEFAULT',
                 override_matrix TEXT DEFAULT '{}',
                 updated_at TEXT DEFAULT ''
-            );
+            )
         """)
         self._conn.commit()
 
@@ -103,11 +102,12 @@ class PipelineRepository:
                            If provided, hash chain data is stored alongside traces.
         """
         now = datetime.now(timezone.utc).isoformat()
-        self._conn.execute(
-            """INSERT OR REPLACE INTO pipelines
-               (intent_id, intent, constraints, context, status, success, output,
-                sub_tasks, rejected_tasks, graph_summary, created_at, completed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        self._conn.upsert(
+            "pipelines",
+            "intent_id",
+            ["intent_id", "intent", "constraints", "context", "status", "success",
+             "output", "sub_tasks", "rejected_tasks", "graph_summary",
+             "created_at", "completed_at"],
             (
                 result.intent_id,
                 intent,
@@ -139,11 +139,11 @@ class PipelineRepository:
     def _save_trace(self, intent_id: str, trace: Trace, hash_data: dict | None = None) -> None:
         """Save a single trace event with optional hash chain data."""
         h = hash_data or {}
-        self._conn.execute(
-            """INSERT OR REPLACE INTO traces
-               (id, intent_id, task_id, event_type, description, details,
-                risk_level, l0_passed, timestamp, hash, previous_hash, sequence)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        self._conn.upsert(
+            "traces",
+            "id",
+            ["id", "intent_id", "task_id", "event_type", "description", "details",
+             "risk_level", "l0_passed", "timestamp", "hash", "previous_hash", "sequence"],
             (
                 trace.id,
                 intent_id,
@@ -215,9 +215,9 @@ class PipelineRepository:
     def pipeline_count(self) -> int:
         """Total number of stored pipelines."""
         row = self._conn.execute("SELECT COUNT(*) as cnt FROM pipelines").fetchone()
-        return row["cnt"]
+        return row["cnt"] if row else 0
 
-    def _row_to_trace(self, row) -> Trace:
+    def _row_to_trace(self, row: dict) -> Trace:
         risk = RiskLevel(row["risk_level"]) if row["risk_level"] else None
         l0 = None
         if row["l0_passed"] is not None:
@@ -244,10 +244,12 @@ class PipelineRepository:
 
     def save_autonomy_settings(self, settings: AutonomySettings) -> None:
         """Persist autonomy settings (single-row upsert)."""
-        self._conn.execute(
-            """INSERT OR REPLACE INTO autonomy_settings (id, profile, override_matrix, updated_at)
-               VALUES (1, ?, ?, ?)""",
+        self._conn.upsert(
+            "autonomy_settings",
+            "id",
+            ["id", "profile", "override_matrix", "updated_at"],
             (
+                1,
                 settings.profile.value,
                 json.dumps(settings.override_matrix),
                 settings.updated_at.isoformat(),
@@ -258,7 +260,8 @@ class PipelineRepository:
     def get_autonomy_settings(self) -> AutonomySettings:
         """Load autonomy settings from DB. Returns DEFAULT if not set."""
         row = self._conn.execute(
-            "SELECT profile, override_matrix, updated_at FROM autonomy_settings WHERE id = 1"
+            "SELECT profile, override_matrix, updated_at FROM autonomy_settings WHERE id = ?",
+            (1,),
         ).fetchone()
         if not row:
             return AutonomySettings()

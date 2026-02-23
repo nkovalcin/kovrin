@@ -63,7 +63,7 @@ def make_result(intent_id: str = "test-intent-1", success: bool = True) -> Execu
 
 class TestPipelineRepository:
     def setup_method(self):
-        self.repo = PipelineRepository(db_path=":memory:")
+        self.repo = PipelineRepository(db_url=":memory:")
 
     def teardown_method(self):
         self.repo.close()
@@ -193,12 +193,12 @@ class TestPersistenceAcrossRestart:
         db_file = str(tmp_path / "test.db")
 
         # Save
-        repo1 = PipelineRepository(db_path=db_file)
+        repo1 = PipelineRepository(db_url=db_file)
         repo1.save_result(make_result("persist-1"), intent="Persist test")
         repo1.close()
 
         # Reopen
-        repo2 = PipelineRepository(db_path=db_file)
+        repo2 = PipelineRepository(db_url=db_file)
         loaded = repo2.get_result("persist-1")
         assert loaded is not None
         assert loaded.intent_id == "persist-1"
@@ -214,11 +214,11 @@ class TestPersistenceAcrossRestart:
         """Traces should persist after closing and reopening the DB."""
         db_file = str(tmp_path / "traces.db")
 
-        repo1 = PipelineRepository(db_path=db_file)
+        repo1 = PipelineRepository(db_url=db_file)
         repo1.save_result(make_result("trace-persist"))
         repo1.close()
 
-        repo2 = PipelineRepository(db_path=db_file)
+        repo2 = PipelineRepository(db_url=db_file)
         traces = repo2.get_traces("trace-persist")
         assert len(traces) == 2
         repo2.close()

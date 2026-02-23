@@ -11,6 +11,7 @@ Usage:
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -78,7 +79,7 @@ class CounterfactualEvalRequest(BaseModel):
 class PipelineManager:
     """Manages running and completed pipelines."""
 
-    def __init__(self, db_path: str = "kovrin.db"):
+    def __init__(self, db_url: str | None = None):
         self._running: dict[str, asyncio.Task] = {}
         self._results: dict[str, ExecutionResult] = {}
         self._ws_connections: list[WebSocket] = []
@@ -88,7 +89,8 @@ class PipelineManager:
         self._approval_requests: dict[str, ApprovalRequest] = {}
 
         # Persistence
-        self._repo = PipelineRepository(db_path)
+        _db_url = db_url or os.environ.get("DATABASE_URL", "kovrin.db")
+        self._repo = PipelineRepository(_db_url)
 
         # Load persisted autonomy settings
         self._autonomy_settings = self._repo.get_autonomy_settings()

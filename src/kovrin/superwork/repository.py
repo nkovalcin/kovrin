@@ -1,9 +1,9 @@
 """
-SuperWork SQLite Persistence
+SuperWork Pipeline Persistence
 
-Stores sessions, proposals, metrics, and events in SQLite.
-Uses the same database file as PipelineRepository (kovrin.db)
-but manages its own tables.
+Stores sessions, proposals, metrics, and events for durability
+across server restarts. Supports SQLite and PostgreSQL
+via the ``kovrin.storage.db`` connection wrapper.
 
 Schema:
 - superwork_sessions: supervisor session state
@@ -13,9 +13,9 @@ Schema:
 """
 
 import json
-import sqlite3
 from datetime import UTC, datetime
 
+from kovrin.storage.db import connect
 from kovrin.superwork.models import (
     MetricsSnapshot,
     ProposalStatus,
@@ -27,17 +27,17 @@ from kovrin.superwork.models import (
 
 
 class SuperWorkRepository:
-    """SQLite-backed storage for SuperWork sessions and proposals."""
+    """Database-backed storage for SuperWork sessions and proposals."""
 
-    def __init__(self, db_path: str = "kovrin.db"):
+    def __init__(self, db_url: str = "kovrin.db"):
         """Initialize repository.
 
         Args:
-            db_path: Path to SQLite database file. Use ":memory:" for testing.
+            db_url: Database URL. Use ``postgresql://...`` for PostgreSQL
+                    or a file path / ``:memory:`` for SQLite.
         """
-        self._db_path = db_path
-        self._conn = sqlite3.connect(db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
+        self._db_url = db_url
+        self._conn = connect(db_url)
         self._create_tables()
 
     def _create_tables(self) -> None:
@@ -99,17 +99,17 @@ class SuperWorkRepository:
             CREATE INDEX IF NOT EXISTS idx_sw_metrics_session
                 ON superwork_metrics(session_id);
             CREATE INDEX IF NOT EXISTS idx_sw_events_session
-                ON superwork_events(session_id);
+                ON superwork_events(session_id)
         """)
 
     # ── Sessions ─────────────────────────────────────────────
 
     def save_session(self, session: SuperWorkSession) -> None:
         """Insert or replace a SuperWork session."""
-        self._conn.execute(
-            """INSERT OR REPLACE INTO superwork_sessions
-               (id, project_path, status, started_at, stopped_at)
-               VALUES (?, ?, ?, ?, ?)""",
+        self._conn.upsert(
+            "superwork_sessions",
+            "id",
+            ["id", "project_path", "status", "started_at", "stopped_at"],
             (
                 session.id,
                 session.project_path,
@@ -146,19 +146,19 @@ class SuperWorkRepository:
             params.append(datetime.now(UTC).isoformat())
         sql += " WHERE id = ?"
         params.append(session_id)
-        self._conn.execute(sql, params)
+        self._conn.execute(sql, tuple(params))
         self._conn.commit()
 
     # ── Proposals ────────────────────────────────────────────
 
     def save_proposal(self, proposal: TaskProposal, session_id: str) -> None:
         """Insert or replace a task proposal."""
-        self._conn.execute(
-            """INSERT OR REPLACE INTO superwork_proposals
-               (id, session_id, title, description, rationale,
-                risk_level, estimated_tokens, auto_execute,
-                dependencies, status, priority, created_at, resolved_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        self._conn.upsert(
+            "superwork_proposals",
+            "id",
+            ["id", "session_id", "title", "description", "rationale",
+             "risk_level", "estimated_tokens", "auto_execute",
+             "dependencies", "status", "priority", "created_at", "resolved_at"],
             (
                 proposal.id,
                 session_id,
@@ -261,11 +261,11 @@ class SuperWorkRepository:
 
     def save_event(self, session_id: str, event: TaskCompletionEvent) -> None:
         """Save a task completion event."""
-        self._conn.execute(
-            """INSERT OR REPLACE INTO superwork_events
-               (id, session_id, completed_task, output_summary,
-                files_changed, errors, duration_seconds, timestamp)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        self._conn.upsert(
+            "superwork_events",
+            "id",
+            ["id", "session_id", "completed_task", "output_summary",
+             "files_changed", "errors", "duration_seconds", "timestamp"],
             (
                 event.id,
                 session_id,
@@ -296,7 +296,7 @@ class SuperWorkRepository:
         self._conn.close()
 
     @staticmethod
-    def _row_to_session(row: sqlite3.Row) -> SuperWorkSession:
+    def _row_to_session(row: dict) -> SuperWorkSession:
         return SuperWorkSession(
             id=row["id"],
             project_path=row["project_path"],
@@ -308,7 +308,7 @@ class SuperWorkRepository:
         )
 
     @staticmethod
-    def _row_to_proposal(row: sqlite3.Row) -> TaskProposal:
+    def _row_to_proposal(row: dict) -> TaskProposal:
         from kovrin.core.models import RiskLevel
 
         return TaskProposal(
@@ -329,7 +329,7 @@ class SuperWorkRepository:
         )
 
     @staticmethod
-    def _row_to_metrics(row: sqlite3.Row) -> MetricsSnapshot:
+    def _row_to_metrics(row: dict) -> MetricsSnapshot:
         return MetricsSnapshot(
             tasks_completed=row["tasks_completed"],
             tasks_failed=row["tasks_failed"],
@@ -344,7 +344,7 @@ class SuperWorkRepository:
         )
 
     @staticmethod
-    def _row_to_event(row: sqlite3.Row) -> TaskCompletionEvent:
+    def _row_to_event(row: dict) -> TaskCompletionEvent:
         return TaskCompletionEvent(
             id=row["id"],
             completed_task=row["completed_task"],

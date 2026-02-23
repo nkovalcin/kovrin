@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -39,7 +40,6 @@ class StartRequest(BaseModel):
     """Request body for starting a SuperWork session."""
 
     project_path: str
-    db_path: str = "kovrin.db"
 
 
 class ProposalActionResponse(BaseModel):
@@ -81,12 +81,12 @@ class SuperWorkManager:
         """Whether a SuperWork session is active."""
         return self._initialized
 
-    async def initialize(self, project_path: str, db_path: str = "kovrin.db") -> SuperWorkSession:
+    async def initialize(self, project_path: str, db_url: str | None = None) -> SuperWorkSession:
         """Initialize all SuperWork components and start watching.
 
         Args:
             project_path: Path to the project to monitor.
-            db_path: Path to SQLite database file.
+            db_url: Database URL. Falls back to DATABASE_URL env var, then "kovrin.db".
 
         Returns:
             The created SuperWork session.
@@ -97,7 +97,8 @@ class SuperWorkManager:
         from kovrin.superwork.repository import SuperWorkRepository
         from kovrin.superwork.session_watcher import SessionWatcher
 
-        self._repo = SuperWorkRepository(db_path)
+        _db_url = db_url or os.environ.get("DATABASE_URL", "kovrin.db")
+        self._repo = SuperWorkRepository(_db_url)
         self._metrics = MetricsTracker()
         self._context = ContextInjector(project_path)
         self._orchestrator = OrchestratorAgent(
@@ -163,7 +164,7 @@ sw_manager = SuperWorkManager()
 @router.post("/start")
 async def start_superwork(body: StartRequest) -> dict:
     """Start a new SuperWork supervisor session."""
-    session = await sw_manager.initialize(body.project_path, body.db_path)
+    session = await sw_manager.initialize(body.project_path)
     return session.model_dump(mode="json")
 
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 
@@ -44,23 +45,24 @@ def main() -> None:
         help="Path to the project directory to monitor.",
     )
     @click.option(
-        "--db",
-        default="kovrin.db",
-        help="Path to SQLite database file.",
+        "--database-url",
+        default=None,
+        help="Database URL (postgresql:// or SQLite path). Defaults to DATABASE_URL env var, then kovrin.db.",
     )
     @click.option(
         "--model",
         default="claude-opus-4-20250514",
         help="Claude model for the Orchestrator Agent.",
     )
-    def superwork(project: str, db: str, model: str) -> None:
+    def superwork(project: str, database_url: str | None, model: str) -> None:
         """Start the Kovrin SuperWork supervisor."""
-        asyncio.run(_run_superwork(project, db, model))
+        db_url = database_url or os.environ.get("DATABASE_URL", "kovrin.db")
+        asyncio.run(_run_superwork(project, db_url, model))
 
     superwork()
 
 
-async def _run_superwork(project_path: str, db_path: str, model: str) -> None:
+async def _run_superwork(project_path: str, db_url: str, model: str) -> None:
     """Main async loop for the SuperWork supervisor."""
     from rich.console import Console
 
@@ -75,7 +77,7 @@ async def _run_superwork(project_path: str, db_path: str, model: str) -> None:
     console.print(f"\n[bold green]KOVRIN SuperWork[/] starting for: {project_path}\n")
 
     # Initialize components
-    repo = SuperWorkRepository(db_path)
+    repo = SuperWorkRepository(db_url)
     metrics = MetricsTracker()
     context = ContextInjector(project_path)
     orchestrator = OrchestratorAgent(
