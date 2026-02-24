@@ -12,10 +12,12 @@
 
 > **Formerly "LATTICE"** — Language for Autonomous Thinking, Transformation, and Intelligent Coordination at Emergent Scale. Premenovaný na **Kovrin** vo februári 2026.
 
-**Verzia frameworku:** `2.0.0-alpha`  
-**Python:** `3.12+`  
-**Stav:** Alpha — core implementovaný, prebieha open-source poriadok  
+**Verzia frameworku:** `2.0.0-alpha`
+**Python:** `3.12+`
+**Stav:** Alpha — core + tools + providers + CLI implementované, **production-verified na Railway**
 **Licencia:** MIT
+**Deployment:** Railway (auto-deploy z `main`) — kovrin-api (FastAPI) + kovrin-web (Next.js)
+**Posledný verified test:** 2026-02-24 — full pipeline SUCCESS (4/4 tasks, 0 rejected, 12 web_search calls)
 
 ---
 
@@ -343,6 +345,38 @@ source .venv/bin/activate            # Aktivuj venv
 
 ---
 
+## Deployment — Railway (Production)
+
+### Služby
+| Služba | Typ | URL |
+|--------|-----|-----|
+| **kovrin-api** | FastAPI (Python) | `https://kovrin-api-production-*.up.railway.app` |
+| **kovrin-web** | Next.js (React) | `https://kovrin-web-production-*.up.railway.app` |
+
+### Environment Variables (Railway)
+| Key | Popis |
+|-----|-------|
+| `ANTHROPIC_API_KEY` | Claude API — pre intent parsing, critic pipeline, task execution |
+| `BRAVE_SEARCH_API_KEY` | Brave Search API — pre `web_search` tool (free tier 2000 req/month) |
+
+### Deployment Flow
+1. `git push origin main` → Railway auto-builds z Dockerfile
+2. Build: `pip install -e .` → `uvicorn kovrin.api.server:app`
+3. Dashboard: Next.js build → static serve
+
+### Testovanie v produkcii
+```bash
+# Health check
+curl https://kovrin-api-production-*.up.railway.app/health
+
+# Run pipeline
+curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
+  -H "Content-Type: application/json" \
+  -d '{"intent": "Search for AI safety frameworks", "tools": true}'
+```
+
+---
+
 ## Git Konvencie
 
 - **Branch naming**: `feat/risk-router-override`, `fix/merkle-chain-verify`, `docs/quickstart`
@@ -362,9 +396,12 @@ source .venv/bin/activate            # Aktivuj venv
 | Multi-model | ✅ Vyriešené | ClaudeProvider, OpenAIProvider, OllamaProvider + ModelRouter |
 | CLI | ✅ Vyriešené | `kovrin run`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
 | GitHub Actions CI | ✅ Vyriešené | pytest + coverage + mypy + ruff + pip-audit |
-| Tool execution | ✅ Vyriešené | 8 safety-gated tools, SafeToolRouter, Brave Search API |
+| Tool execution | ✅ Vyriešené | 8 safety-gated tools, SafeToolRouter, Brave Search API (live, verified) |
 | Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (9 types) |
 | Structured logging | ✅ Vyriešené | JSON + human-readable via kovrin.logging |
+| FeasibilityCritic false rejections | ✅ Vyriešené | Improved prompt s detailed tool capabilities, explicit eval rules. Verified: 4/4 tasks PASS. |
+| Hardcoded model strings | 🟡 Stredná | ~10 miest s `claude-sonnet-4-20250514` → provider abstrakcia. Nefunkčný bug, len tech debt. |
+| Pre-existing API tests (7) | 🟡 Nízka | `test_api.py` testy zlyhávajú bez bežiaceho servera + ANTHROPIC_API_KEY. Skip cez `--ignore`. |
 
 ---
 
@@ -510,6 +547,47 @@ superwork = [
 
 **Fáza 4 — SaaS (3-6 mesiacov)**
 - [ ] app.kovrin.ai, team features, SOC 2, marketplace
+
+**Fáza X — KOVRIN ako AI Operating System (dlhodobá vízia)**
+
+Kovrin sa stane keyboard-first AI workspace — nie framework knižnica, ale plnohodnotná aplikácia (web/desktop) kde user ovláda všetko z jedného textového inputu.
+
+Koncept:
+- **Jeden input v strede obrazovky.** User píše, Kovrin orchestruje.
+- **Multi-projekt, multi-session, multi-agent.** User má otvorených N projektov, každý má sessions, agenti pracujú paralelne.
+- **Opus rozhoduje, Sonnet stavia.** Smart model switching — Opus ako orchestrátor, Sonnet na implementáciu, Haiku na triviálne tasky. Cost efficiency.
+- **Keyboard-first, mouse-less.** Žiadna myš. Všetko cez klávesové skratky a text. Efektívnejšie, zdravšie, sústrednejšie.
+- **User vidí všetko.** Sessions, agenti, ktoré súbory sa menia (live), generované obrázky/videá, orchestrátor status.
+- **Plne autonómny ale s human loop.** Agenti si sami definujú ďalšie prompty, systematicky vylepšujú. User koriguje smer.
+
+Layout:
+```
+┌─Sessions──┐  ┌─Agenti────┐  ┌─Súbory (live)─┐  ┌─Media──┐
+│ projekt A  │  │ agent 1   │  │ src/app.py    │  │ images │
+│ projekt B  │  │ agent 2   │  │ src/api.py    │  │ video  │
+│ projekt C  │  │ agent 3   │  │ LIVE CHANGES  │  │ gen    │
+└────────────┘  └───────────┘  └───────────────┘  └────────┘
+
+┌─Orchestrator (Opus)──────────────────────────────────────┐
+│ "Projekt A: refactor → 3 tasks → Sonnet, parallel, 4m"  │
+└──────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────┐
+│  > _  jeden input. píšeš. všetko sa deje.                │
+└──────────────────────────────────────────────────────────┘
+```
+
+5 pilierov:
+1. **Security** — Constitutional Core, Merkle audit, DCT tokeny (máme)
+2. **Smart Model Switching** — Opus/Sonnet/Haiku routing (máme providers)
+3. **Cost Efficiency** — správny model na správny task
+4. **Autonomy** — agenti si sami plánujú ďalšie kroky
+5. **Human Loop** — user vidí a koriguje, jeden input
+
+Integrácie: MCP, Chrome automation, Playwright, screen recording — všetko cez kvalitné prompty.
+Platforma: Web app (Next.js) → Desktop (Tauri) → Mouse-less AI workspace.
+
+> Toto je Y Combinator level vízia. Engine pod kapotou = to čo máme. UI/UX = to čo treba postaviť.
 
 ---
 

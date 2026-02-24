@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* Kovrin Design System */
+
+:root {
+  --kovrin-bg: #0A0A0B;
+  --kovrin-surface: #111113;
+  --kovrin-surface-hover: #18181B;
+  --kovrin-border: #27272A;
+  --kovrin-border-accent: #3F3F46;
+  --kovrin-text: #FAFAFA;
+  --kovrin-text-muted: #71717A;
+  --kovrin-text-dim: #52525B;
+  --kovrin-accent: #10B981;
+  --kovrin-accent-dim: #059669;
+  --kovrin-accent-bg: rgba(16, 185, 129, 0.08);
+  --kovrin-danger: #EF4444;
+  --kovrin-warning: #F59E0B;
+  --kovrin-info: #3B82F6;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--kovrin-bg);
+  color: var(--kovrin-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* All UI labels, nav, badges, headings use JetBrains Mono */
+h1, h2, h3, h4, h5, h6,
+button,
+label,
+nav,
+th,
+code, pre,
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+}
+
+/* Zero border-radius globally */
+*, *::before, *::after {
+  border-radius: 0 !important;
+}
+
+/* Buttons: uppercase, tracking */
+button {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Focus ring: emerald */
+*:focus-visible {
+  outline: 2px solid var(--kovrin-accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--kovrin-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kovrin-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--kovrin-border-accent);
+}

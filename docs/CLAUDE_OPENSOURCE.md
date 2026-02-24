@@ -1,4 +1,9 @@
-# CLAUDE.md — Instructions for Claude Code
+# TARGET STATE DOCUMENT
+# This describes the DESIRED open-source structure, NOT the current implementation.
+# The current implementation is documented in the root CLAUDE.md file.
+# Do not assume this structure exists — it must be reconciled before release.
+
+# CLAUDE.md — Instructions for Claude Code (Target State)
 
 ## Project Identity
 

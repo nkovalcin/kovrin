@@ -66,23 +66,23 @@ export default function PrmScoreView({ intentId }: Props) {
                   style={{ width: `${score.aggregate_score * 100}%` }}
                 />
               </div>
-              <span className="text-[10px] text-gray-500 font-mono">{score.step_count} steps</span>
+              <span className="text-[10px] text-gray-500 font-mono">{score.step_scores.length} steps</span>
               <span className="text-[10px] text-gray-600 font-mono truncate max-w-[200px]">{score.task_id}</span>
               <span className="text-gray-600 text-xs">{expanded === score.task_id ? '\u25B2' : '\u25BC'}</span>
             </button>
 
             {expanded === score.task_id && (
               <div className="border-t border-gray-700/50 px-4 py-3 space-y-2 bg-gray-800/30">
-                {score.step_scores.map((stepScore, i) => (
+                {score.step_scores.map((step, i) => (
                   <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
                     <span className="text-gray-600 w-8">#{i}</span>
                     <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${scoreBg(stepScore)}`}
-                        style={{ width: `${stepScore * 100}%` }}
+                        className={`h-full rounded-full ${scoreBg(step.score)}`}
+                        style={{ width: `${step.score * 100}%` }}
                       />
                     </div>
-                    <span className={scoreColor(stepScore)}>{stepScore.toFixed(2)}</span>
+                    <span className={scoreColor(step.score)}>{step.score.toFixed(2)}</span>
                   </div>
                 ))}
                 {score.reasoning && (

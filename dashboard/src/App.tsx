@@ -11,6 +11,7 @@ import ReplayViewer from './components/ReplayViewer'
 import PrmScoreView from './components/PrmScoreView'
 import TokensView from './components/TokensView'
 import TopologyView from './components/TopologyView'
+import SuperWorkDashboard from './components/superwork/SuperWorkDashboard'
 import type { ApprovalItem } from './components/ApprovalQueue'
 import { connectWebSocket, getAutonomy, getResult, getStatus, runPipeline } from './api/client'
 import type {
@@ -23,19 +24,20 @@ import type {
   WsMessage,
 } from './types/kovrin'
 
-type Tab = 'intent' | 'traces' | 'graph' | 'watchdog' | 'result' | 'approvals' | 'autonomy' | 'replay' | 'prm' | 'tokens'
+type Tab = 'superwork' | 'intent' | 'traces' | 'graph' | 'watchdog' | 'result' | 'approvals' | 'autonomy' | 'replay' | 'prm' | 'tokens'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'intent', label: 'Intent' },
-  { id: 'traces', label: 'Traces' },
-  { id: 'graph', label: 'Graph' },
-  { id: 'prm', label: 'PRM' },
-  { id: 'tokens', label: 'Tokens' },
-  { id: 'watchdog', label: 'Watchdog' },
-  { id: 'approvals', label: 'Approvals' },
-  { id: 'autonomy', label: 'Autonomy' },
-  { id: 'replay', label: 'Replay' },
-  { id: 'result', label: 'Result' },
+const TABS: { id: Tab; label: string; section?: string }[] = [
+  { id: 'superwork', label: 'SuperWork', section: 'supervisor' },
+  { id: 'intent', label: 'Intent', section: 'pipeline' },
+  { id: 'traces', label: 'Traces', section: 'pipeline' },
+  { id: 'graph', label: 'Graph', section: 'pipeline' },
+  { id: 'prm', label: 'PRM', section: 'pipeline' },
+  { id: 'tokens', label: 'Tokens', section: 'pipeline' },
+  { id: 'watchdog', label: 'Watchdog', section: 'safety' },
+  { id: 'approvals', label: 'Approvals', section: 'safety' },
+  { id: 'autonomy', label: 'Autonomy', section: 'safety' },
+  { id: 'replay', label: 'Replay', section: 'pipeline' },
+  { id: 'result', label: 'Result', section: 'pipeline' },
 ]
 
 const DEFAULT_AUTONOMY: AutonomySettings = {
@@ -45,7 +47,7 @@ const DEFAULT_AUTONOMY: AutonomySettings = {
 }
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('intent')
+  const [tab, setTab] = useState<Tab>('superwork')
   const [isRunning, setIsRunning] = useState(false)
   const [status, setStatus] = useState<PipelineStatus | null>(null)
   const [result, setResult] = useState<ExecutionResult | null>(null)
@@ -65,7 +67,7 @@ export default function App() {
 
   const handleWsMessage = useCallback((msg: WsMessage) => {
     if (msg.type === 'trace' && msg.data) {
-      const trace = msg.data as Trace
+      const trace = msg.data as unknown as Trace
       setTraces((prev) => [...prev, trace])
 
       if (trace.event_type?.startsWith('WATCHDOG_')) {
@@ -89,13 +91,13 @@ export default function App() {
     }
 
     if (msg.type === 'approval_request' && msg.data) {
-      const item = msg.data as ApprovalItem
+      const item = msg.data as unknown as ApprovalItem
       setApprovals((prev) => [...prev, item])
       setTab('approvals')
     }
 
     if (msg.type === 'autonomy_updated' && msg.data) {
-      setAutonomySettings(msg.data as AutonomySettings)
+      setAutonomySettings(msg.data as unknown as AutonomySettings)
     }
 
     if (msg.type === 'pipeline_complete' && msg.intent_id) {
@@ -163,9 +165,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex">
-      <nav className="w-48 bg-gray-900 border-r border-gray-800 p-4 flex flex-col">
+      <nav className="w-48 bg-[#111113] border-r border-[#27272A] p-4 flex flex-col">
         <div className="mb-4">
-          <h1 className="text-xl font-bold text-indigo-400 tracking-tight">LATTICE</h1>
+          <h1 className="text-xl font-bold text-emerald-400 tracking-tight">KOVRIN</h1>
           <p className="text-[10px] text-gray-500 mt-0.5 font-mono">v{status?.version || '2.0.0-alpha'}</p>
         </div>
 
@@ -174,31 +176,44 @@ export default function App() {
         </div>
 
         <div className="space-y-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                tab === t.id
-                  ? 'bg-indigo-500/20 text-indigo-300'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
-              }`}
-            >
-              {t.label}
-              {t.id === 'traces' && traces.length > 0 && (
-                <span className="ml-2 text-[10px] bg-gray-700 px-1.5 py-0.5 rounded-full">{traces.length}</span>
-              )}
-              {t.id === 'watchdog' && alerts.length > 0 && (
-                <span className="ml-2 text-[10px] bg-red-500/30 text-red-300 px-1.5 py-0.5 rounded-full">{alerts.length}</span>
-              )}
-              {t.id === 'approvals' && approvals.length > 0 && (
-                <span className="ml-2 text-[10px] bg-amber-500/30 text-amber-300 px-1.5 py-0.5 rounded-full animate-pulse">{approvals.length}</span>
-              )}
-            </button>
-          ))}
+          {(() => {
+            let lastSection = ''
+            return TABS.map((t) => {
+              const showSection = t.section && t.section !== lastSection
+              if (t.section) lastSection = t.section
+              return (
+                <div key={t.id}>
+                  {showSection && (
+                    <p className="text-[9px] uppercase tracking-widest text-gray-600 mt-3 mb-1 px-3 font-mono">
+                      {t.section}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => setTab(t.id)}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                      tab === t.id
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : 'text-[#71717A] hover:text-[#FAFAFA] hover:bg-[#18181B]'
+                    }`}
+                  >
+                    {t.label}
+                    {t.id === 'traces' && traces.length > 0 && (
+                      <span className="ml-2 text-[10px] bg-gray-700 px-1.5 py-0.5">{traces.length}</span>
+                    )}
+                    {t.id === 'watchdog' && alerts.length > 0 && (
+                      <span className="ml-2 text-[10px] bg-red-500/30 text-red-300 px-1.5 py-0.5">{alerts.length}</span>
+                    )}
+                    {t.id === 'approvals' && approvals.length > 0 && (
+                      <span className="ml-2 text-[10px] bg-amber-500/30 text-amber-300 px-1.5 py-0.5 animate-pulse">{approvals.length}</span>
+                    )}
+                  </button>
+                </div>
+              )
+            })
+          })()}
         </div>
 
-        <div className="mt-auto pt-4 border-t border-gray-800">
+        <div className="mt-auto pt-4 border-t border-[#27272A]">
           <div className="text-[10px] text-gray-500 space-y-1">
             <div className="flex justify-between">
               <span>Running</span>
@@ -213,6 +228,9 @@ export default function App() {
       </nav>
 
       <main className="flex-1 p-6 overflow-y-auto max-h-screen">
+        {tab === 'superwork' && (
+          <SuperWorkDashboard />
+        )}
         {tab === 'intent' && (
           <IntentPanel onSubmit={handleRun} isRunning={isRunning} />
         )}

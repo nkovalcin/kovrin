@@ -38,8 +38,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://kovrin.ai"
-Documentation = "https://docs.kovrin.dev"
+Homepage = "https://kovrin.dev"
+Documentation = "https://kovrin.dev"
 Repository = "https://github.com/nkovalcin/kovrin"
 Issues = "https://github.com/nkovalcin/kovrin/issues"
 

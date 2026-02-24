@@ -7,10 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/kovrin/"><img src="https://img.shields.io/pypi/v/kovrin?style=flat-square&color=10B981" alt="PyPI" /></a>
   <a href="https://github.com/nkovalcin/kovrin/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" /></a>
   <a href="https://github.com/nkovalcin/kovrin"><img src="https://img.shields.io/github/stars/nkovalcin/kovrin?style=flat-square&color=10B981" alt="Stars" /></a>
-  <a href="https://docs.kovrin.dev"><img src="https://img.shields.io/badge/docs-kovrin.dev-3B82F6?style=flat-square" alt="Docs" /></a>
 </p>
 
 ---
@@ -35,17 +33,16 @@ Most frameworks treat safety as an afterthought: prompt-level instructions that 
 
 ```bash
 pip install kovrin
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ```python
 from kovrin import Kovrin
 
-engine = Kovrin()
-
-result = await engine.run(
-    intent="Analyze costs and suggest savings",
-    constraints=["Do not suggest layoffs"],
-    context={"budget": 15000}
+engine = Kovrin(tools=True)
+result = engine.run_sync(
+    intent="Search for Python 3.13 features and summarize them",
+    constraints=["Be concise", "Focus on developer-relevant features"],
 )
 
 # Behind the scenes, KOVRIN:
@@ -54,23 +51,23 @@ result = await engine.run(
 # 3. Verified constitutional constraints (5 axioms, SHA-256)
 # 4. Built execution DAG with dependency resolution
 # 5. Routed each task through risk matrix (AUTO/SANDBOX/HUMAN)
-# 6. Executed with concurrent semaphore (max 5)
+# 6. Executed with safety-gated tools (web search, code analysis, etc.)
 # 7. Logged every event to Merkle hash chain
 
 print(result.output)
 print(result.traces)  # Full audit trail
 ```
 
-Or synchronously:
+Or async:
 
 ```python
-result = engine.run_sync("Analyze costs and suggest savings")
+result = await engine.run("Analyze costs and suggest savings")
 ```
 
 ## Architecture
 
 ```
-User: "Analyze costs and suggest savings"
+User: "Search for Python 3.13 features"
      |
      v
 +- IntentV2 -------------------------------------------+
@@ -149,6 +146,18 @@ log = ImmutableTraceLog()
 assert log.verify_integrity()  # True if no tampering
 ```
 
+### Safety-Gated Tools
+
+8 built-in tools with per-tool risk profiles, sandboxed execution, and Merkle-audited calls:
+
+```python
+engine = Kovrin(tools=True)
+
+# Built-in: web_search, calculator, datetime, json_transform,
+#           code_analysis, http_request, file_read, file_write
+# Each tool has risk_level, requires_sandbox, allowed_domains
+```
+
 ### Multi-Agent Coordination
 
 Secure agent coordination with **Delegation Capability Tokens (DCT)**:
@@ -178,14 +187,6 @@ engine = Kovrin(watchdog=True)
 # Graduated: WARN -> PAUSE -> KILL (irreversible)
 ```
 
-### MCTS + Beam Search
-
-Explore multiple decomposition strategies before committing:
-
-```python
-engine = Kovrin(explore=True, mcts_iterations=5, beam_width=3)
-```
-
 ## EU AI Act Compliance
 
 KOVRIN maps directly to EU AI Act requirements:
@@ -203,14 +204,14 @@ KOVRIN maps directly to EU AI Act requirements:
 
 ```
 specs/
-  TaskStateMachine.tla    — Task lifecycle state machine
-  AxiomValidation.tla     — Constitutional axiom verification
-  RoutingMatrix.tla       — Risk routing decisions
-  GraphExecution.tla      — DAG execution semantics
-  WatchdogMonitor.tla     — Temporal monitoring rules
-  SpeculationModel.tla    — Speculative execution tiers
-  HashChain.tla           — Merkle chain immutability
-  KovrinSafety.tla        — Top-level composition (10 invariants)
+  TaskStateMachine.tla    -- Task lifecycle state machine
+  AxiomValidation.tla     -- Constitutional axiom verification
+  RoutingMatrix.tla       -- Risk routing decisions
+  GraphExecution.tla      -- DAG execution semantics
+  WatchdogMonitor.tla     -- Temporal monitoring rules
+  SpeculationModel.tla    -- Speculative execution tiers
+  HashChain.tla           -- Merkle chain immutability
+  KovrinSafety.tla        -- Top-level composition (10 invariants)
 ```
 
 ## Project Structure
@@ -222,34 +223,25 @@ src/kovrin/
   engine/         # Graph executor, risk router, MCTS, beam search, PRM, tokens
   safety/         # Critics pipeline, watchdog agent
   audit/          # Immutable trace logger (Merkle hash chain)
-  agents/         # Agent coordinator, registry, tools
+  agents/         # Agent coordinator, registry
+  tools/          # 8 safety-gated tools (web search, code analysis, etc.)
+  providers/      # Multi-model (Claude, OpenAI, Ollama) + circuit breaker
   api/            # FastAPI server (REST + WebSocket + SSE)
   schema/         # JSON Schema + TypeScript exporter
   storage/        # SQLite persistence
 
 specs/            # TLA+ formal verification (8 modules)
 dashboard/        # React/TypeScript dashboard (12 components)
-tests/            # 480 tests (unit + adversarial + integration)
-```
-
-## Schema Export
-
-Auto-generate TypeScript types from Pydantic models:
-
-```bash
-python -m kovrin.schema.exporter --list                    # List 29 models, 13 enums
-python -m kovrin.schema.exporter --json-schema schemas/    # Export JSON Schema
-python -m kovrin.schema.exporter --typescript types.ts     # Generate TypeScript
-python -m kovrin.schema.exporter --validate existing.ts    # Detect drift
+tests/            # 734 tests (unit + adversarial + integration)
 ```
 
 ## Testing
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -v              # All 480 tests
-pytest -m adversarial -v      # 29 adversarial attack tests
-pytest -m "not integration"   # Without Claude API calls
+pytest tests/ -v                       # All 734 tests
+pytest -m adversarial -v               # 41 adversarial attack tests
+pytest -m "not integration"            # Without API calls
 ```
 
 ## Contributing
@@ -270,9 +262,7 @@ MIT — see [LICENSE](LICENSE) for details.
 ## Links
 
 - **Website**: [kovrin.ai](https://kovrin.ai)
-- **Documentation**: [docs.kovrin.dev](https://docs.kovrin.dev)
 - **GitHub**: [github.com/nkovalcin/kovrin](https://github.com/nkovalcin/kovrin)
-- **PyPI**: [pypi.org/project/kovrin](https://pypi.org/project/kovrin)
 
 ---
 

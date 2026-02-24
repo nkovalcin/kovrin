@@ -37,7 +37,7 @@ export default function TopologyView({ intentId }: Props) {
         setTopology(r.topology as TopologyType || null)
         setConfidence(r.confidence || 0)
         setReasoning(r.reasoning || '')
-        setMetrics(r.metrics || {})
+        setMetrics(r.graph_metrics || {})
       })
       .finally(() => setLoading(false))
   }, [intentId])

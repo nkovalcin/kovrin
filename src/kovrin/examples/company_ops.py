@@ -15,7 +15,7 @@ Usage:
 
 import asyncio
 
-from kovrin import Lattice
+from kovrin import Kovrin
 
 
 async def main():

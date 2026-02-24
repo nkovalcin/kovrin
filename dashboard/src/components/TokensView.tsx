@@ -22,7 +22,7 @@ export default function TokensView({}: Props) {
   useEffect(() => { refresh() }, [])
 
   if (!enabled) {
-    return <p className="text-gray-500 text-sm">Delegation tokens are not enabled. Initialize Lattice with <code className="text-indigo-400">enable_tokens=True</code>.</p>
+    return <p className="text-gray-500 text-sm">Delegation tokens are not enabled. Initialize Kovrin with <code className="text-emerald-400">enable_tokens=True</code>.</p>
   }
 
   if (loading) {

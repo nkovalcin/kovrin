@@ -40,8 +40,8 @@ export default function IntentPanel({ onSubmit, isRunning }: Props) {
       <textarea
         value={intent}
         onChange={(e) => setIntent(e.target.value)}
-        placeholder="Describe what you want LATTICE to do..."
-        className="w-full h-28 bg-gray-800 border border-gray-700 rounded-lg p-3 text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+        placeholder="Describe what you want Kovrin to do..."
+        className="w-full h-28 bg-gray-800 border border-gray-700 rounded-lg p-3 text-gray-100 placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none resize-none"
       />
 
       <div>
@@ -49,7 +49,7 @@ export default function IntentPanel({ onSubmit, isRunning }: Props) {
           <label className="text-sm font-medium text-gray-400">Constraints</label>
           <button
             onClick={addConstraint}
-            className="text-xs text-indigo-400 hover:text-indigo-300"
+            className="text-xs text-emerald-400 hover:text-emerald-300"
           >
             + Add
           </button>
@@ -61,7 +61,7 @@ export default function IntentPanel({ onSubmit, isRunning }: Props) {
                 value={c}
                 onChange={(e) => updateConstraint(i, e.target.value)}
                 placeholder="e.g. Do not suggest layoffs"
-                className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:border-indigo-500 outline-none"
+                className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:border-emerald-500 outline-none"
               />
               {constraints.length > 1 && (
                 <button
@@ -81,7 +81,7 @@ export default function IntentPanel({ onSubmit, isRunning }: Props) {
         <textarea
           value={contextJson}
           onChange={(e) => setContextJson(e.target.value)}
-          className="w-full h-20 bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm font-mono text-gray-100 focus:border-indigo-500 outline-none resize-none"
+          className="w-full h-20 bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm font-mono text-gray-100 focus:border-emerald-500 outline-none resize-none"
         />
         {contextError && <p className="text-red-400 text-xs mt-1">{contextError}</p>}
       </div>
@@ -89,7 +89,7 @@ export default function IntentPanel({ onSubmit, isRunning }: Props) {
       <button
         onClick={handleSubmit}
         disabled={!intent.trim() || isRunning}
-        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-medium transition-colors"
+        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-medium transition-colors"
       >
         {isRunning ? 'Running...' : 'Run Pipeline'}
       </button>

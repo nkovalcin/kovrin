@@ -63,7 +63,7 @@ export default function WatchdogStatus({ alerts, status }: Props) {
                   <span className="font-semibold">{a.severity}</span>
                   <span className="font-mono text-gray-400">{a.rule}</span>
                   <span className="ml-auto text-gray-500 font-mono text-[10px]">
-                    {new Date(a.timestamp).toLocaleTimeString()}
+                    {a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : ''}
                   </span>
                 </div>
                 <p className="text-sm mt-1">{a.reason}</p>

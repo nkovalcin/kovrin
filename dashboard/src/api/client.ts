@@ -5,9 +5,14 @@ import type {
   CounterfactualResult,
   DelegationToken,
   ExecutionResult,
+  MetricsSnapshot,
   PipelineStatus,
+  PredictionResult,
+  ProjectAnalysis,
   PrmScore,
   ReplaySession,
+  SuperWorkSession,
+  SuperWorkWsMessage,
   TopologyRecommendation,
   Trace,
   WsMessage,
@@ -131,6 +136,95 @@ export function connectWebSocket(onMessage: (msg: WsMessage) => void): WebSocket
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data) as WsMessage
+      onMessage(msg)
+    } catch {
+      // ignore malformed messages
+    }
+  }
+
+  const interval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping' }))
+    }
+  }, 30000)
+
+  ws.onclose = () => clearInterval(interval)
+
+  return ws
+}
+
+// ─── SuperWork API ────────────────────────────────────────────
+
+export async function startSuperWorkSession(
+  projectPath: string,
+  dbPath: string = 'kovrin.db',
+): Promise<SuperWorkSession> {
+  const res = await fetch(`${BASE}/api/superwork/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_path: projectPath, db_path: dbPath }),
+  })
+  return res.json()
+}
+
+export async function getSuperWorkSession(): Promise<SuperWorkSession & { error?: string }> {
+  const res = await fetch(`${BASE}/api/superwork/session`)
+  return res.json()
+}
+
+export async function getSuperWorkProposals(): Promise<ProjectAnalysis> {
+  const res = await fetch(`${BASE}/api/superwork/proposals`)
+  return res.json()
+}
+
+export async function approveSuperWorkProposal(
+  proposalId: string,
+): Promise<{ proposal_id: string; status: string; message: string }> {
+  const res = await fetch(`${BASE}/api/superwork/proposals/${proposalId}/approve`, {
+    method: 'POST',
+  })
+  return res.json()
+}
+
+export async function skipSuperWorkProposal(
+  proposalId: string,
+): Promise<{ proposal_id: string; status: string; message: string }> {
+  const res = await fetch(`${BASE}/api/superwork/proposals/${proposalId}/skip`, {
+    method: 'POST',
+  })
+  return res.json()
+}
+
+export async function getSuperWorkMetrics(): Promise<MetricsSnapshot & { error?: string }> {
+  const res = await fetch(`${BASE}/api/superwork/metrics`)
+  return res.json()
+}
+
+export async function getSuperWorkPrediction(
+  remainingTasks: number = 10,
+): Promise<PredictionResult & { error?: string }> {
+  const res = await fetch(`${BASE}/api/superwork/predict`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remaining_tasks: remainingTasks }),
+  })
+  return res.json()
+}
+
+export async function listSuperWorkSessions(): Promise<{ sessions: SuperWorkSession[]; total: number }> {
+  const res = await fetch(`${BASE}/api/superwork/sessions`)
+  return res.json()
+}
+
+export function connectSuperWorkWebSocket(
+  onMessage: (msg: SuperWorkWsMessage) => void,
+): WebSocket {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const ws = new WebSocket(`${protocol}//${window.location.host}/api/superwork/ws`)
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data) as SuperWorkWsMessage
       onMessage(msg)
     } catch {
       // ignore malformed messages
