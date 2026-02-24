@@ -356,14 +356,18 @@ source .venv/bin/activate            # Aktivuj venv
 
 > **DÔLEŽITÉ:** `dashboard/` v kovrin repo je STARÝ Vite+React prototyp. Produkčný frontend je `kovrin-web/`.
 
-### Schéma domén
+### Schéma domén — 3-service architektúra
 
-| Doména | Čo servuje | Railway služba |
-|--------|-----------|----------------|
-| **kovrin.dev** | Marketing landing page (hero, features, pricing, waitlist, blog) | kovrin-web |
-| **app.kovrin.dev** | App dashboard (SuperWork, pipeline, audit, approvals, settings) | kovrin-web |
-| **api.kovrin.dev** | FastAPI backend (REST + WebSocket) | kovrin-api |
-| **docs.kovrin.dev** | Dokumentácia (Fumadocs) — zatiaľ neexistuje | — |
+Každá doména je **samostatná Railway služba** (rovnaký kovrin-web repo, rôzny `SITE_MODE`):
+
+| Doména | Čo servuje | Railway služba | SITE_MODE |
+|--------|-----------|----------------|-----------|
+| **kovrin.dev** | Marketing landing page (hero, features, pricing, waitlist, blog) | kovrin-marketing | `marketing` |
+| **app.kovrin.dev** | App dashboard (SuperWork, pipeline, audit, approvals, settings) | kovrin-dashboard | `dashboard` |
+| **docs.kovrin.dev** | Dokumentácia (getting-started, architecture, api-reference) | kovrin-docs | `docs` |
+| **api.kovrin.dev** | FastAPI backend (REST + WebSocket) | kovrin-api | — |
+
+> **Routing**: Next.js middleware v `src/middleware.ts` kontroluje `SITE_MODE` env var a restricuje routes podľa domény. Cross-domain linky používajú `src/lib/domains.ts` helper.
 
 ### Sitemap (podľa design spec)
 
@@ -389,11 +393,13 @@ source .venv/bin/activate            # Aktivuj venv
 
 ## Deployment — Railway (Production)
 
-### Služby
-| Služba | Repo | Builder | URL |
-|--------|------|---------|-----|
-| **kovrin-api** | `kovrin` | Dockerfile (Python 3.12-slim + uvicorn) | `https://kovrin-api-production-*.up.railway.app` |
-| **kovrin-web** | `kovrin-web` | Nixpacks (Node 20 + Next.js) | `https://kovrin-web-production-*.up.railway.app` |
+### Služby (4 Railway services)
+| Služba | Repo | Builder | Custom domain | SITE_MODE |
+|--------|------|---------|---------------|-----------|
+| **kovrin-api** | `kovrin` | Dockerfile (Python 3.12-slim + uvicorn) | `api.kovrin.dev` | — |
+| **kovrin-marketing** | `kovrin-web` | Nixpacks (Node 20 + Next.js) | `kovrin.dev` | `marketing` |
+| **kovrin-dashboard** | `kovrin-web` | Nixpacks (Node 20 + Next.js) | `app.kovrin.dev` | `dashboard` |
+| **kovrin-docs** | `kovrin-web` | Nixpacks (Node 20 + Next.js) | `docs.kovrin.dev` | `docs` |
 
 ### Environment Variables — kovrin-api (Railway)
 | Key | Popis |
@@ -401,39 +407,50 @@ source .venv/bin/activate            # Aktivuj venv
 | `ANTHROPIC_API_KEY` | Claude API — pre intent parsing, critic pipeline, task execution |
 | `BRAVE_SEARCH_API_KEY` | Brave Search API — pre `web_search` tool (free tier 2000 req/month) |
 
-### Environment Variables — kovrin-web (Railway)
-| Key | Povinné | Popis |
-|-----|---------|-------|
-| `DATABASE_URL` | 🔴 ÁNO | PostgreSQL connection string pre waitlist. Treba Railway Postgres service. |
-| `KOVRIN_API_INTERNAL_URL` | 🔴 ÁNO | Interná Railway URL kovrin-api (napr. `http://kovrin-api.railway.internal:8000`). Bez nej proxy routes padajú na `localhost:8000`. |
-| `NEXT_PUBLIC_KOVRIN_WS_URL` | 🟡 Build-time | Verejná WS URL kovrin-api (napr. `wss://kovrin-api-production-*.up.railway.app`). Bez nej WebSocket disabled. Musí byť nastavená PRED buildom. |
+### Environment Variables — kovrin-web (Railway, per service)
+| Key | Služba | Povinné | Popis |
+|-----|--------|---------|-------|
+| `SITE_MODE` | všetky 3 | 🔴 ÁNO | `marketing` / `dashboard` / `docs` — určuje ktoré routes sa servujú |
+| `DATABASE_URL` | marketing | 🟡 Voliteľné | PostgreSQL pre waitlist. Bez nej graceful degradation. |
+| `KOVRIN_API_INTERNAL_URL` | dashboard | 🔴 ÁNO | Interná Railway URL kovrin-api (napr. `http://kovrin-api.railway.internal:8000`). |
+| `NEXT_PUBLIC_KOVRIN_WS_URL` | dashboard | 🟡 Build-time | Verejná WS URL (napr. `wss://api.kovrin.dev`). Bez nej WebSocket disabled. |
+| `NEXT_PUBLIC_MARKETING_URL` | všetky 3 | 🟡 | Default: `https://kovrin.dev` |
+| `NEXT_PUBLIC_DASHBOARD_URL` | všetky 3 | 🟡 | Default: `https://app.kovrin.dev` |
+| `NEXT_PUBLIC_DOCS_URL` | všetky 3 | 🟡 | Default: `https://docs.kovrin.dev` |
 
 ### kovrin-web — Kľúčové súbory
 ```
 kovrin-web/
-├── src/app/
-│   ├── (marketing)/          # Route group — landing page
-│   │   ├── layout.tsx
-│   │   └── page.tsx          # Hero, Features, Pricing, Waitlist, Comparison
-│   ├── app/                  # Dashboard routes
-│   │   ├── overview/
-│   │   ├── approvals/
-│   │   ├── audit/
-│   │   ├── feed/
-│   │   ├── pipeline/
-│   │   ├── proposals/
-│   │   └── settings/
-│   └── api/
-│       ├── waitlist/route.ts         # PostgreSQL waitlist (pg.Pool)
-│       └── proxy/
-│           ├── kovrin/[...path]/     # Proxy → kovrin-api
-│           └── superwork/[...path]/  # Proxy → kovrin-api/superwork
-├── src/components/
-│   ├── kovrin/               # Pipeline dashboard components
-│   └── superwork/            # SuperWork dashboard components
-├── src/lib/
-│   ├── kovrin/api.ts         # Kovrin API client + WebSocket
-│   └── superwork/api.ts      # SuperWork API client + WebSocket
+├── src/
+│   ├── middleware.ts              # SITE_MODE routing (marketing/dashboard/docs)
+│   ├── lib/
+│   │   ├── domains.ts            # Cross-domain URL helpers (docsUrl, dashboardUrl, marketingUrl)
+│   │   ├── kovrin/api.ts         # Kovrin API client + WebSocket
+│   │   └── superwork/api.ts      # SuperWork API client + WebSocket
+│   ├── app/
+│   │   ├── (marketing)/          # Route group — landing page (kovrin.dev)
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx          # Hero, Features, Pricing, Waitlist, Comparison
+│   │   ├── app/                  # Dashboard routes (app.kovrin.dev)
+│   │   │   ├── overview/
+│   │   │   ├── approvals/
+│   │   │   ├── audit/
+│   │   │   ├── feed/
+│   │   │   ├── pipeline/
+│   │   │   ├── proposals/
+│   │   │   └── settings/
+│   │   ├── docs/                 # Documentation (docs.kovrin.dev)
+│   │   │   ├── getting-started/
+│   │   │   ├── architecture/
+│   │   │   └── api-reference/
+│   │   └── api/
+│   │       ├── waitlist/route.ts         # PostgreSQL waitlist (lazy pool)
+│   │       └── proxy/
+│   │           ├── kovrin/[...path]/     # Proxy → kovrin-api
+│   │           └── superwork/[...path]/  # Proxy → kovrin-api/superwork
+│   └── components/
+│       ├── kovrin/               # Pipeline dashboard components
+│       └── superwork/            # SuperWork dashboard components
 ├── railway.toml              # builder = nixpacks
 ├── nixpacks.toml             # Node 20, npm ci, npm run build
 └── package.json              # Next.js 16, React 19, Tailwind v4
@@ -441,18 +458,24 @@ kovrin-web/
 
 ### Deployment Flow
 **kovrin-api:** `git push origin main` → Railway auto-builds z Dockerfile → `uvicorn kovrin.api.server:app`
-**kovrin-web:** `git push origin main` → Railway Nixpacks → `npm ci && npm run build && npm start`
+**kovrin-web (3 služby):** `git push origin main` → Railway Nixpacks → `npm ci && npm run build && npm start` (každá služba má iný `SITE_MODE`)
 
 ### Testovanie v produkcii
 ```bash
-# API health check
-curl https://kovrin-api-production-*.up.railway.app/health
+# Marketing
+curl -s -o /dev/null -w "%{http_code}" https://kovrin.dev/
 
-# Web health check
-curl https://kovrin-web-production-*.up.railway.app/
+# Docs
+curl -s -o /dev/null -w "%{http_code}" https://docs.kovrin.dev/getting-started
+
+# Dashboard
+curl -s -o /dev/null -w "%{http_code}" https://app.kovrin.dev/app/overview
+
+# API
+curl https://api.kovrin.dev/api/health
 
 # Run pipeline
-curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
+curl -X POST https://api.kovrin.dev/api/pipeline \
   -H "Content-Type: application/json" \
   -d '{"intent": "Search for AI safety frameworks", "tools": true}'
 ```
