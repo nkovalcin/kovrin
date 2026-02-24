@@ -460,11 +460,11 @@ class TestTraceLogTampering:
         valid, _ = log.verify_integrity()
         assert valid
 
-        # Tamper: modify description of event 1
-        log._events[1].trace.description = "TAMPERED"
-        valid, msg = log.verify_integrity()
-        assert not valid
-        assert "Tampered" in msg or "event 1" in msg
+        # Tamper attempt: Trace is frozen (immutable), so direct modification
+        # is blocked at the Pydantic level — this is the strongest guarantee.
+        import pydantic
+        with pytest.raises(pydantic.ValidationError, match="frozen"):
+            log._events[1].trace.description = "TAMPERED"
 
     def test_modifying_hash_breaks_chain(self):
         log = ImmutableTraceLog()

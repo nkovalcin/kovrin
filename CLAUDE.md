@@ -44,9 +44,9 @@ Framework kde bezpečnosť AI agentov nie je runtime filter, ale **architektonic
 | Metrika | Hodnota |
 |---------|---------|
 | Fázy whitepaperu | 6/6 implementovaných (Phase 7 neexistuje) |
-| Testy | **734** (z toho 41 adversarial) |
+| Testy | **741** (z toho 42 adversarial) |
 | TLA+ špecifikácie | **8 modulov**, 10 safety invariantov |
-| Pydantic modely | **29 modelov, 13 enumov** |
+| Pydantic modely | **42 modelov, 17 enumov** (24/12 v core, zvyšok v tools/providers/intent/superwork) |
 | Dashboard komponenty | **12** (React/TypeScript) |
 | LLM Providers | **3** (Claude, OpenAI, Ollama) |
 | Built-in Tools | **8** (safety-gated, Merkle-audited) |
@@ -100,13 +100,13 @@ kovrin/
 │   │   ├── router.py          # ModelRouter — task-based model selection
 │   │   └── circuit_breaker.py # CircuitBreakerProvider — fault tolerance
 │   ├── api/
-│   │   └── server.py          # FastAPI — REST + WebSocket + SSE
+│   │   └── server.py          # FastAPI — REST + WebSocket
 │   ├── schema/
 │   │   ├── exporter.py        # SchemaExporter (JSON Schema + TypeScript)
 │   │   └── __main__.py        # CLI: python -m kovrin.schema
 │   ├── storage/
 │   │   └── repository.py      # SQLite persistence
-│   ├── exceptions.py          # KovrinError hierarchy (9 exception types)
+│   ├── exceptions.py          # KovrinError hierarchy (10 exception types)
 │   ├── logging.py             # Structured logging (JSON + human-readable)
 │   ├── cli.py                 # CLI: kovrin run, verify, audit, serve, status
 │   └── examples/
@@ -128,7 +128,7 @@ kovrin/
 │   │   ├── api/client.ts
 │   │   └── components/        # 12 komponentov
 │   └── package.json
-├── tests/                   # 734 testov
+├── tests/                   # 741 testov
 │   ├── test_adversarial.py        # 30 adversarial (P0 + P1)
 │   ├── test_adversarial_tokens.py # 11 adversarial (P2)
 │   ├── test_adversarial_tools.py  # 13 adversarial (tool safety)
@@ -199,7 +199,7 @@ Deterministická tabuľka: `(RiskLevel × SpeculationTier) → RoutingAction`
 
 - Temporal rules: `NoExecutionAfterRejection`, `ExcessiveFailureRate`, `UnexpectedEventSequence`
 - Graduated containment: `WARN → PAUSE → KILL` (KILL je irereverzibilný)
-- `AgentDriftTracker` — Jensen-Shannon divergencia, `CrossAgentConsistency`
+- `AgentDriftTracker` — threshold-based drift classification na PRM scores a success rate, `CrossAgentConsistency` keyword-based sentiment heuristic
 
 ### DCT — Delegation Capability Tokens (`src/kovrin/engine/tokens.py`)
 
@@ -239,8 +239,8 @@ Deterministická tabuľka: `(RiskLevel × SpeculationTier) → RoutingAction`
 
 | Komponent | Pravidlo |
 |-----------|---------|
-| `ConstitutionalCore` | Zero externé závislosti. Žiadne API volania, žiadne I/O. |
-| `RiskRouter` | Pure data — matrix + overrides. Žiadne side effects. |
+| `ConstitutionalCore` | Axiom definície, integrity hash a statické metódy sú zero-dependency pure computation. `check()` deleguje na Claude API pre sémantickú axiom evaluáciu. |
+| `RiskRouter` | Pure data matrix + overrides pre `route()`. `request_human_approval()` vykonáva I/O. |
 | `ImmutableTraceLog` | Write-only z pohľadu engine. Read-only pre Watchdog. |
 | `WatchdogAgent` | Read-only observer. Môže triggernúť WARN/PAUSE/KILL, ale nikdy nemodifikuje tasky. |
 | `TokenAuthority` | Jediný komponent vydávajúci/validujúci/revokujúci DCT tokeny. |
@@ -314,8 +314,8 @@ source .venv/bin/activate            # Aktivuj venv
 .venv/bin/python -m ...
 
 # ── Testy ────────────────────────────────────────────────────────────────────
-.venv/bin/python -m pytest tests/ -v                              # Všetky (734)
-.venv/bin/python -m pytest tests/ -m adversarial -v              # Adversarial (41)
+.venv/bin/python -m pytest tests/ -v                              # Všetky (741)
+.venv/bin/python -m pytest tests/ -m adversarial -v              # Adversarial (42)
 .venv/bin/python -m pytest tests/test_schema_exporter.py -v      # Schema (24)
 .venv/bin/python -m pytest tests/ -m "not integration" -v        # Bez API calls
 
@@ -362,7 +362,7 @@ source .venv/bin/activate            # Aktivuj venv
 |--------|-----------|----------------|
 | **kovrin.dev** | Marketing landing page (hero, features, pricing, waitlist, blog) | kovrin-web |
 | **app.kovrin.dev** | App dashboard (SuperWork, pipeline, audit, approvals, settings) | kovrin-web |
-| **api.kovrin.dev** | FastAPI backend (REST + WebSocket + SSE) | kovrin-api |
+| **api.kovrin.dev** | FastAPI backend (REST + WebSocket) | kovrin-api |
 | **docs.kovrin.dev** | Dokumentácia (Fumadocs) — zatiaľ neexistuje | — |
 
 ### Sitemap (podľa design spec)
@@ -479,7 +479,7 @@ curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
 | CLI | ✅ Vyriešené | `kovrin run`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
 | GitHub Actions CI | ✅ Vyriešené | pytest + coverage + mypy + ruff + pip-audit |
 | Tool execution | ✅ Vyriešené | 8 safety-gated tools, SafeToolRouter, Brave Search API (live, verified) |
-| Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (9 types) |
+| Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (10 types) |
 | Structured logging | ✅ Vyriešené | JSON + human-readable via kovrin.logging |
 | FeasibilityCritic false rejections | ✅ Vyriešené | Improved prompt s detailed tool capabilities, explicit eval rules. Verified: 4/4 tasks PASS. |
 | Hardcoded model strings | 🟡 Stredná | ~10 miest s `claude-sonnet-4-20250514` → provider abstrakcia. Nefunkčný bug, len tech debt. |

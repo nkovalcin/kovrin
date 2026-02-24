@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # ─── Enums ───────────────────────────────────────────────────
 
@@ -94,6 +94,8 @@ class ToolCategory(str, Enum):
 class ProofObligation(BaseModel):
     """Result of checking a sub-task against a single Layer 0 axiom."""
 
+    model_config = ConfigDict(frozen=True)
+
     axiom_id: int
     axiom_name: str
     description: str
@@ -125,6 +127,8 @@ class SubTask(BaseModel):
 class Trace(BaseModel):
     """An immutable audit event in the execution pipeline."""
 
+    model_config = ConfigDict(frozen=True)
+
     id: str = Field(default_factory=lambda: f"tr-{uuid.uuid4().hex[:8]}")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     intent_id: str = ""
@@ -141,6 +145,8 @@ class Trace(BaseModel):
 
 class RoutingDecision(BaseModel):
     """Output of the risk router for a single sub-task."""
+
+    model_config = ConfigDict(frozen=True)
 
     task_id: str
     action: RoutingAction
@@ -170,6 +176,8 @@ class ExecutionResult(BaseModel):
 
 class WatchdogAlert(BaseModel):
     """An alert raised by the watchdog agent."""
+
+    model_config = ConfigDict(frozen=True)
 
     id: str = Field(default_factory=lambda: f"alert-{uuid.uuid4().hex[:8]}")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -259,6 +267,8 @@ class BeamState(BaseModel):
 class ConfidenceEstimate(BaseModel):
     """Claude-based confidence estimate for a task output."""
 
+    model_config = ConfigDict(frozen=True)
+
     task_id: str
     confidence: float = Field(0.5, ge=0.0, le=1.0)
     reasoning: str = ""
@@ -312,6 +322,8 @@ class AutonomySettings(BaseModel):
 class ReplayFrame(BaseModel):
     """A single step in a decision replay session."""
 
+    model_config = ConfigDict(frozen=True)
+
     sequence: int = 0
     trace_id: str = ""
     hash: str = ""
@@ -329,6 +341,8 @@ class ReplayFrame(BaseModel):
 class ReplaySession(BaseModel):
     """A loaded replay for a completed pipeline."""
 
+    model_config = ConfigDict(frozen=True)
+
     intent_id: str
     total_frames: int = 0
     frames: list[ReplayFrame] = Field(default_factory=list)
@@ -345,6 +359,8 @@ class CounterfactualRequest(BaseModel):
 
 class CounterfactualResult(BaseModel):
     """Per-task routing diff between actual and hypothetical."""
+
+    model_config = ConfigDict(frozen=True)
 
     task_id: str
     task_description: str = ""
@@ -371,6 +387,8 @@ class TopologyType(str, Enum):
 class PrmStepScore(BaseModel):
     """Score for a single reasoning step within a task output."""
 
+    model_config = ConfigDict(frozen=True)
+
     step_index: int
     description: str = ""
     score: float = Field(0.5, ge=0.0, le=1.0)
@@ -379,6 +397,8 @@ class PrmStepScore(BaseModel):
 
 class PrmScore(BaseModel):
     """Process Reward Model score for a complete task."""
+
+    model_config = ConfigDict(frozen=True)
 
     task_id: str
     step_scores: list[PrmStepScore] = Field(default_factory=list)
@@ -439,6 +459,8 @@ class DelegationToken(BaseModel):
 
 class TopologyRecommendation(BaseModel):
     """Result of automatic topology analysis."""
+
+    model_config = ConfigDict(frozen=True)
 
     topology: TopologyType = TopologyType.SEQUENTIAL
     confidence: float = Field(0.5, ge=0.0, le=1.0)

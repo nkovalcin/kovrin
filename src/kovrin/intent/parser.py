@@ -4,17 +4,18 @@ Kovrin Intent Decomposition Engine
 Decomposes high-level intents into executable sub-tasks using
 HTN-inspired planning via Claude API.
 
-Implements the LLM-Modulo pattern (Kambhampati et al., ICML 2024):
-1. Claude generates candidate decompositions
-2. Critics validate each sub-task
-3. Invalid decompositions are fed back for iteration
-4. Max 3 attempts before failure
+Single-shot decomposition: Claude generates a candidate decomposition,
+which is then parsed into structured SubTask objects. On parse failure,
+gracefully falls back to a single-task decomposition.
 
 Each sub-task includes:
 - Description of the work
 - Risk classification
 - Speculation tier
 - Dependencies on other sub-tasks
+
+Note: Iterative LLM-Modulo refinement (critic feedback loop) is planned
+for a future release.
 """
 
 import json
@@ -29,7 +30,6 @@ class IntentParser:
     """Decomposes intents into sub-task graphs via Claude API."""
 
     MODEL = "claude-sonnet-4-20250514"
-    MAX_ATTEMPTS = 3
 
     def __init__(self, client: anthropic.AsyncAnthropic | None = None):
         self._client = client or anthropic.AsyncAnthropic()

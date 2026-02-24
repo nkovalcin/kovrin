@@ -1,11 +1,17 @@
 """
-Kovrin Sandboxed Execution Environment
+Kovrin Controlled Execution Environment
 
-Provides controlled execution for tools that need isolation:
-- Timeout enforcement via asyncio.wait_for
-- Code execution in subprocess with resource limits
-- Network domain allowlisting
-- Filesystem path validation
+Provides advisory-gated execution for tool code:
+- Timeout enforcement via asyncio.wait_for + process kill
+- Code execution in subprocess with clean environment (stripped env vars)
+- Output size limits (configurable max bytes)
+- Advisory network domain allowlisting (pre-flight check, not enforced at OS level)
+- Advisory filesystem path validation (pre-flight check, not chroot)
+
+Note: This is NOT a true sandbox — the subprocess runs as the same user
+with full filesystem and network access. The controls are advisory.
+For true isolation, a future version should use setrlimit, Docker, or
+seccomp-bpf. See: https://github.com/kovrin-dev/kovrin/issues/TBD
 """
 
 from __future__ import annotations
@@ -39,7 +45,12 @@ SANDBOX_DEFAULTS = {
 
 
 class SandboxedExecutor:
-    """Executes tools in a controlled environment with resource limits."""
+    """Executes tools in a controlled environment with timeout enforcement.
+
+    Provides: timeout (kill on exceed), clean env vars, output size caps,
+    advisory path/domain validation. Does NOT provide: OS-level isolation,
+    resource limits (memory/CPU), or network firewalling.
+    """
 
     def __init__(self, config: SandboxConfig | None = None):
         self._config = config or SandboxConfig()

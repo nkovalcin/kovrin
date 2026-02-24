@@ -4,6 +4,9 @@ import json
 import tempfile
 from pathlib import Path
 
+import pydantic
+import pytest
+
 from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.models import RiskLevel, Trace
 
@@ -62,11 +65,9 @@ class TestImmutableTraceLog:
         log.append(Trace(event_type="E1", description="Event 1"))
         log.append(Trace(event_type="E2", description="Event 2"))
 
-        # Tamper with trace content
-        log._events[0].trace.description = "MODIFIED"
-
-        valid, msg = log.verify_integrity()
-        assert valid is False
+        # Trace is frozen (immutable) — direct modification is blocked at Pydantic level
+        with pytest.raises(pydantic.ValidationError, match="frozen"):
+            log._events[0].trace.description = "MODIFIED"
 
     def test_head_hash_updates(self):
         log = ImmutableTraceLog()
