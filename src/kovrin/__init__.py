@@ -28,8 +28,8 @@ from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.constitutional import ConstitutionalCore
 from kovrin.core.models import (
     AutonomySettings,
-    ExplorationResult,
     ExecutionResult,
+    ExplorationResult,
     SubTask,
     TaskStatus,
     Trace,
@@ -131,7 +131,9 @@ class Kovrin:
             topology: If True, enables automatic topology selection for task graphs.
             tools: If True, enables safety-gated tool execution (code, web, file ops).
         """
-        self._client = anthropic.AsyncAnthropic(api_key=api_key) if api_key else anthropic.AsyncAnthropic()
+        self._client = (
+            anthropic.AsyncAnthropic(api_key=api_key) if api_key else anthropic.AsyncAnthropic()
+        )
         self._constitutional = ConstitutionalCore(self._client)
         self._parser = IntentParser(self._client)
         self._router = RiskRouter()
@@ -140,6 +142,7 @@ class Kovrin:
         self._prm = None
         if enable_prm:
             from kovrin.engine.prm import ProcessRewardModel
+
             self._prm = ProcessRewardModel(self._client)
 
         # Safety-gated tool execution system
@@ -147,9 +150,9 @@ class Kovrin:
         self._tool_registry = None
         self._tool_router = None
         if tools:
+            from kovrin.tools.builtin import register_all_builtins
             from kovrin.tools.registry import ToolRegistry
             from kovrin.tools.router import SafeToolRouter
-            from kovrin.tools.builtin import register_all_builtins
 
             self._tool_registry = ToolRegistry()
             register_all_builtins(self._tool_registry)
@@ -162,7 +165,8 @@ class Kovrin:
             )
 
         self._executor = TaskExecutor(
-            self._client, self._router,
+            self._client,
+            self._router,
             approval_callback=approval_callback,
             autonomy_settings=autonomy_settings,
             prm=self._prm,
@@ -175,7 +179,9 @@ class Kovrin:
         _tool_names = [t.name for t in self._tool_registry.get_all()] if self._tool_registry else []
         self._feasibility_critic = FeasibilityCritic(self._client, available_tools=_tool_names)
         self._policy_critic = PolicyCritic(self._client)
-        self._critics = CriticPipeline(self._safety_critic, self._feasibility_critic, self._policy_critic)
+        self._critics = CriticPipeline(
+            self._safety_critic, self._feasibility_critic, self._policy_critic
+        )
         self._auto_approve_sandbox = auto_approve_sandbox
 
         # Watchdog (enable agent drift when both agents and watchdog are on)
@@ -187,6 +193,7 @@ class Kovrin:
         self._token_authority = None
         if enable_tokens:
             from kovrin.engine.tokens import TokenAuthority
+
             self._token_authority = TokenAuthority()
             # Wire token authority into tool router for DCT scope checks
             if self._tool_router:
@@ -200,7 +207,8 @@ class Kovrin:
             self._registry = AgentRegistry(self._client)
             self._registry.register_defaults()
             self._coordinator = AgentCoordinator(
-                self._registry, self._client,
+                self._registry,
+                self._client,
                 token_authority=self._token_authority,
             )
 
@@ -209,6 +217,7 @@ class Kovrin:
         self._topology_analyzer = None
         if topology:
             from kovrin.engine.topology import TopologyAnalyzer
+
             self._topology_analyzer = TopologyAnalyzer()
 
         # Phase 4: Exploration
@@ -222,6 +231,7 @@ class Kovrin:
 
         if explore:
             from kovrin.engine.mcts import CriticBasedScorer, MCTSExplorer
+
             scorer = CriticBasedScorer(self._critics)
             self._mcts = MCTSExplorer(
                 parser=self._parser,
@@ -231,12 +241,14 @@ class Kovrin:
             )
         if beam_width > 1:
             from kovrin.engine.beam_search import BeamSearchExecutor
+
             self._beam_executor = BeamSearchExecutor(
                 beam_width=beam_width,
                 max_concurrent_per_beam=max_concurrent,
             )
         if enable_confidence:
             from kovrin.engine.confidence import ConfidenceEstimator
+
             self._confidence = ConfidenceEstimator(self._client)
 
     def update_autonomy_settings(self, settings: AutonomySettings | None) -> None:
@@ -296,26 +308,26 @@ class Kovrin:
             context=context,
         )
 
-        await trace_log.append_async(Trace(
-            intent_id=intent_obj.id,
-            event_type="INTENT_RECEIVED",
-            description=f"Intent: {intent[:80]}",
-            details={
-                "constraints": constraints or [],
-                "context": context or {},
-                "watchdog": self._watchdog_enabled,
-                "agents": self._agents_enabled,
-            },
-        ))
+        await trace_log.append_async(
+            Trace(
+                intent_id=intent_obj.id,
+                event_type="INTENT_RECEIVED",
+                description=f"Intent: {intent[:80]}",
+                details={
+                    "constraints": constraints or [],
+                    "context": context or {},
+                    "watchdog": self._watchdog_enabled,
+                    "agents": self._agents_enabled,
+                },
+            )
+        )
 
         # 2. Decompose into sub-tasks
         exploration_info = None
         all_candidates = None
 
         if self._explore and self._mcts:
-            best, all_candidates = await self._mcts.explore(
-                intent_obj, constraints, context
-            )
+            best, all_candidates = await self._mcts.explore(intent_obj, constraints, context)
             subtasks = best.subtasks
             exploration_info = ExplorationResult(
                 candidates_explored=len(all_candidates),
@@ -323,25 +335,31 @@ class Kovrin:
                 mcts_iterations=self._mcts_iterations,
                 beam_width=self._beam_width,
             )
-            await trace_log.append_async(Trace(
-                intent_id=intent_obj.id,
-                event_type="MCTS_EXPLORATION",
-                description=f"MCTS explored {len(all_candidates)} decompositions, best score={best.score:.2f}",
-                details={
-                    "candidates": len(all_candidates),
-                    "best_score": best.score,
-                    "best_variant": best.prompt_variant,
-                },
-            ))
+            await trace_log.append_async(
+                Trace(
+                    intent_id=intent_obj.id,
+                    event_type="MCTS_EXPLORATION",
+                    description=f"MCTS explored {len(all_candidates)} decompositions, best score={best.score:.2f}",
+                    details={
+                        "candidates": len(all_candidates),
+                        "best_score": best.score,
+                        "best_variant": best.prompt_variant,
+                    },
+                )
+            )
         else:
             subtasks = await self._parser.parse(intent_obj)
 
-        await trace_log.append_async(Trace(
-            intent_id=intent_obj.id,
-            event_type="DECOMPOSITION",
-            description=f"Decomposed into {len(subtasks)} sub-tasks",
-            details={"tasks": [{"id": t.id, "description": t.description[:60]} for t in subtasks]},
-        ))
+        await trace_log.append_async(
+            Trace(
+                intent_id=intent_obj.id,
+                event_type="DECOMPOSITION",
+                description=f"Decomposed into {len(subtasks)} sub-tasks",
+                details={
+                    "tasks": [{"id": t.id, "description": t.description[:60]} for t in subtasks]
+                },
+            )
+        )
 
         # 3. Validate each sub-task through critic pipeline
         approved_tasks: list[SubTask] = []
@@ -352,11 +370,13 @@ class Kovrin:
 
             # Check watchdog kill signal
             if self._watchdog and self._watchdog.is_killed:
-                await trace_log.append_async(Trace(
-                    intent_id=intent_obj.id,
-                    event_type="WATCHDOG_KILLED",
-                    description="Pipeline killed by watchdog during validation",
-                ))
+                await trace_log.append_async(
+                    Trace(
+                        intent_id=intent_obj.id,
+                        event_type="WATCHDOG_KILLED",
+                        description="Pipeline killed by watchdog during validation",
+                    )
+                )
                 break
 
             passed, obligations = await self._critics.evaluate(
@@ -367,7 +387,9 @@ class Kovrin:
             )
 
             subtask.proof_obligations = obligations
-            await trace_log.append_async(CriticPipeline.create_trace(subtask, passed, obligations, intent_obj.id))
+            await trace_log.append_async(
+                CriticPipeline.create_trace(subtask, passed, obligations, intent_obj.id)
+            )
 
             if passed:
                 approved_tasks.append(subtask)
@@ -376,11 +398,13 @@ class Kovrin:
                 rejected_tasks.append(subtask)
 
         if not approved_tasks:
-            await trace_log.append_async(Trace(
-                intent_id=intent_obj.id,
-                event_type="PIPELINE_ABORTED",
-                description="All sub-tasks rejected by critics — pipeline aborted",
-            ))
+            await trace_log.append_async(
+                Trace(
+                    intent_id=intent_obj.id,
+                    event_type="PIPELINE_ABORTED",
+                    description="All sub-tasks rejected by critics — pipeline aborted",
+                )
+            )
             trace_log.print_summary()
             return ExecutionResult(
                 intent_id=intent_obj.id,
@@ -402,16 +426,19 @@ class Kovrin:
 
         optimizations = graph.optimize()
         if optimizations:
-            await trace_log.append_async(Trace(
-                intent_id=intent_obj.id,
-                event_type="GRAPH_OPTIMIZATION",
-                description=f"Graph optimized: {', '.join(optimizations)}",
-                details={"optimizations": optimizations, "waves": graph.execution_order},
-            ))
+            await trace_log.append_async(
+                Trace(
+                    intent_id=intent_obj.id,
+                    event_type="GRAPH_OPTIMIZATION",
+                    description=f"Graph optimized: {', '.join(optimizations)}",
+                    details={"optimizations": optimizations, "waves": graph.execution_order},
+                )
+            )
 
         # 4b. Topology analysis (optional)
         if self._topology_analyzer:
             from kovrin.engine.topology import TopologyAnalyzer
+
             recommendation = self._topology_analyzer.analyze(graph)
             await trace_log.append_async(
                 TopologyAnalyzer.create_trace(recommendation, intent_obj.id)
@@ -420,21 +447,25 @@ class Kovrin:
         # 5. Choose execution function
         if self._agents_enabled and self._coordinator:
             execute_fn = self._coordinator.execute_with_agent
-            await trace_log.append_async(Trace(
-                intent_id=intent_obj.id,
-                event_type="MULTI_AGENT_MODE",
-                description=f"Multi-agent execution with {len(self._registry)} agents",
-                details={"agents": [a.info.model_dump() for a in self._registry.agents]},
-            ))
+            await trace_log.append_async(
+                Trace(
+                    intent_id=intent_obj.id,
+                    event_type="MULTI_AGENT_MODE",
+                    description=f"Multi-agent execution with {len(self._registry)} agents",
+                    details={"agents": [a.info.model_dump() for a in self._registry.agents]},
+                )
+            )
         else:
             execute_fn = self._executor.execute_for_graph
 
         # 6. Execute graph
-        await trace_log.append_async(Trace(
-            intent_id=intent_obj.id,
-            event_type="EXECUTION_START",
-            description=f"Executing {len(approved_tasks)} tasks across {len(graph.execution_order)} waves",
-        ))
+        await trace_log.append_async(
+            Trace(
+                intent_id=intent_obj.id,
+                event_type="EXECUTION_START",
+                description=f"Executing {len(approved_tasks)} tasks across {len(graph.execution_order)} waves",
+            )
+        )
 
         if self._beam_executor and all_candidates and len(all_candidates) > 1:
             valid_candidates = [c for c in all_candidates if c.critic_pass_rate > 0]
@@ -478,16 +509,18 @@ class Kovrin:
                 "paused": self._watchdog.is_paused,
             }
 
-        await trace_log.append_async(Trace(
-            intent_id=intent_obj.id,
-            event_type="PIPELINE_COMPLETE",
-            description=f"Pipeline complete: {len(results)}/{len(approved_tasks)} tasks succeeded",
-            details={
-                "completed": len(results),
-                "total": len(approved_tasks),
-                "watchdog": watchdog_info,
-            },
-        ))
+        await trace_log.append_async(
+            Trace(
+                intent_id=intent_obj.id,
+                event_type="PIPELINE_COMPLETE",
+                description=f"Pipeline complete: {len(results)}/{len(approved_tasks)} tasks succeeded",
+                details={
+                    "completed": len(results),
+                    "total": len(approved_tasks),
+                    "watchdog": watchdog_info,
+                },
+            )
+        )
 
         trace_log.print_summary()
 

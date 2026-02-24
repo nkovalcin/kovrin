@@ -1,7 +1,5 @@
 """Tests for LATTICE Risk Router."""
 
-import pytest
-
 from kovrin.core.models import (
     RiskLevel,
     RoutingAction,

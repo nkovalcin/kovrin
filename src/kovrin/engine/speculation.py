@@ -24,6 +24,7 @@ from kovrin.core.models import (
 @dataclass
 class Checkpoint:
     """A snapshot of task state before speculative execution."""
+
     task_id: str
     task_snapshot: dict = field(default_factory=dict)
     result: str | None = None
@@ -59,23 +60,27 @@ class SpeculativeContext:
             task_snapshot=subtask.model_dump(),
         )
         self._checkpoints[subtask.id] = cp
-        self._traces.append(Trace(
-            intent_id=subtask.parent_intent_id or "",
-            task_id=subtask.id,
-            event_type="SPECULATION_CHECKPOINT",
-            description=f"Checkpoint created for GUARDED task: {subtask.description[:60]}",
-        ))
+        self._traces.append(
+            Trace(
+                intent_id=subtask.parent_intent_id or "",
+                task_id=subtask.id,
+                event_type="SPECULATION_CHECKPOINT",
+                description=f"Checkpoint created for GUARDED task: {subtask.description[:60]}",
+            )
+        )
         return cp
 
     def commit(self, checkpoint: Checkpoint) -> None:
         """Commit a speculative execution (result is accepted)."""
         checkpoint.committed = True
-        self._traces.append(Trace(
-            intent_id="",
-            task_id=checkpoint.task_id,
-            event_type="SPECULATION_COMMIT",
-            description=f"Speculative result committed for task {checkpoint.task_id}",
-        ))
+        self._traces.append(
+            Trace(
+                intent_id="",
+                task_id=checkpoint.task_id,
+                event_type="SPECULATION_COMMIT",
+                description=f"Speculative result committed for task {checkpoint.task_id}",
+            )
+        )
 
     def rollback(self, checkpoint: Checkpoint, subtask: SubTask) -> None:
         """Rollback a speculative execution (restore task state)."""
@@ -83,12 +88,14 @@ class SpeculativeContext:
         snapshot = checkpoint.task_snapshot
         subtask.status = TaskStatus(snapshot.get("status", "PENDING"))
         subtask.output = snapshot.get("output")
-        self._traces.append(Trace(
-            intent_id=subtask.parent_intent_id or "",
-            task_id=checkpoint.task_id,
-            event_type="SPECULATION_ROLLBACK",
-            description=f"Speculative result rolled back for task {checkpoint.task_id}",
-        ))
+        self._traces.append(
+            Trace(
+                intent_id=subtask.parent_intent_id or "",
+                task_id=checkpoint.task_id,
+                event_type="SPECULATION_ROLLBACK",
+                description=f"Speculative result rolled back for task {checkpoint.task_id}",
+            )
+        )
 
     @property
     def traces(self) -> list[Trace]:

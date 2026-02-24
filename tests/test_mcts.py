@@ -1,31 +1,26 @@
 """Tests for LATTICE MCTS Decomposition Explorer."""
 
 import json
-import math
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from kovrin.core.models import (
     DecompositionCandidate,
     MCTSNode,
-    RiskLevel,
     SubTask,
 )
 from kovrin.engine.mcts import (
+    _VARIANT_INSTRUCTIONS,
+    PROMPT_VARIANTS,
     CriticBasedScorer,
     MCTSExplorer,
-    PROMPT_VARIANTS,
-    _VARIANT_INSTRUCTIONS,
 )
 from kovrin.intent.schema import IntentV2
 
 
 def _make_subtasks(n=3, prefix="task"):
-    return [
-        SubTask(id=f"{prefix}_{i}", description=f"Task {i}")
-        for i in range(n)
-    ]
+    return [SubTask(id=f"{prefix}_{i}", description=f"Task {i}") for i in range(n)]
 
 
 class TestCriticBasedScorer:
@@ -187,10 +182,12 @@ class TestMCTSExplorer:
         client = AsyncMock()
         response = MagicMock()
         response.content = [MagicMock()]
-        response.content[0].text = json.dumps([
-            {"description": "V task 1", "risk_level": "LOW"},
-            {"description": "V task 2", "risk_level": "LOW"},
-        ])
+        response.content[0].text = json.dumps(
+            [
+                {"description": "V task 1", "risk_level": "LOW"},
+                {"description": "V task 2", "risk_level": "LOW"},
+            ]
+        )
         client.messages.create = AsyncMock(return_value=response)
 
         explorer = MCTSExplorer(

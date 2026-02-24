@@ -25,7 +25,8 @@ import sys
 def cli() -> None:
     """Main CLI entry point. Uses click if available, falls back to argparse."""
     try:
-        import click
+        import click  # noqa: F401
+
         _click_cli()
     except ImportError:
         _argparse_cli()
@@ -57,14 +58,16 @@ def _click_cli() -> None:
         json_output: bool,
     ) -> None:
         """Execute a Kovrin pipeline from an intent."""
-        asyncio.run(_run_pipeline(
-            intent=intent,
-            tools=tools,
-            watchdog=watchdog,
-            agents=agents,
-            constraints=list(constraints),
-            json_output=json_output,
-        ))
+        asyncio.run(
+            _run_pipeline(
+                intent=intent,
+                tools=tools,
+                watchdog=watchdog,
+                agents=agents,
+                constraints=list(constraints),
+                json_output=json_output,
+            )
+        )
 
     @app.command()
     @click.argument("intent_id", required=False)
@@ -132,14 +135,16 @@ def _argparse_cli() -> None:
     args = parser.parse_args()
 
     if args.command == "run":
-        asyncio.run(_run_pipeline(
-            intent=args.intent,
-            tools=args.tools,
-            watchdog=args.watchdog,
-            agents=args.agents,
-            constraints=args.constraints,
-            json_output=args.json_output,
-        ))
+        asyncio.run(
+            _run_pipeline(
+                intent=args.intent,
+                tools=args.tools,
+                watchdog=args.watchdog,
+                agents=args.agents,
+                constraints=args.constraints,
+                json_output=args.json_output,
+            )
+        )
     elif args.command == "audit":
         _audit(args.intent_id)
     elif args.command == "verify":
@@ -178,11 +183,13 @@ async def _run_pipeline(
 
     # Subscribe to trace events for live output
     if not json_output:
+
         async def _on_trace(hashed: object) -> None:
             t = hashed.trace  # type: ignore[attr-defined]
             risk_str = f" [{t.risk_level.value}]" if t.risk_level else ""
             l0_str = " [L0:PASS]" if t.l0_passed else ""
             print(f"  [{t.event_type:24s}]{risk_str}{l0_str} {t.description}")
+
         trace_log.subscribe(_on_trace)
 
     try:
@@ -198,6 +205,7 @@ async def _run_pipeline(
     print()
     if json_output:
         import json
+
         print(json.dumps(result.model_dump(), indent=2, default=str))
     else:
         _print_header("Result")
@@ -214,8 +222,9 @@ async def _run_pipeline(
 
 def _audit(intent_id: str | None) -> None:
     """View audit trail from stored results."""
-    from kovrin.storage.repository import PipelineRepository
     import os
+
+    from kovrin.storage.repository import PipelineRepository
 
     db_url = os.environ.get("DATABASE_URL", "kovrin.db")
     repo = PipelineRepository(db_url)
@@ -230,7 +239,9 @@ def _audit(intent_id: str | None) -> None:
         for row in traces:
             risk_str = f" [{row['risk_level']}]" if row.get("risk_level") else ""
             hash_str = row.get("hash", "")[:12]
-            print(f"  #{row['sequence']:3d} {row['event_type']:24s}{risk_str} {row['description'][:60]}  [{hash_str}]")
+            print(
+                f"  #{row['sequence']:3d} {row['event_type']:24s}{risk_str} {row['description'][:60]}  [{hash_str}]"
+            )
     else:
         # List recent pipelines
         pipelines = repo.list_pipelines(limit=20)
@@ -240,13 +251,16 @@ def _audit(intent_id: str | None) -> None:
             return
         for p in pipelines:
             status = "SUCCESS" if p.get("success") else "FAILED"
-            print(f"  {p['intent_id'][:12]}  [{status:7s}]  {p.get('intent', '')[:50]}  ({p.get('created_at', '')})")
+            print(
+                f"  {p['intent_id'][:12]}  [{status:7s}]  {p.get('intent', '')[:50]}  ({p.get('created_at', '')})"
+            )
 
 
 def _verify() -> None:
     """Verify Merkle chain integrity."""
-    from kovrin.storage.repository import PipelineRepository
     import os
+
+    from kovrin.storage.repository import PipelineRepository
 
     db_url = os.environ.get("DATABASE_URL", "kovrin.db")
     repo = PipelineRepository(db_url)
@@ -320,6 +334,7 @@ def _status() -> None:
 
     # Version
     from kovrin import __version__
+
     print(f"  Version: {__version__}")
 
     # Python
@@ -346,6 +361,7 @@ def _status() -> None:
 
     # Check env vars
     import os
+
     print("\n  Environment:")
     env_vars = ["ANTHROPIC_API_KEY", "BRAVE_SEARCH_API_KEY", "OPENAI_API_KEY", "DATABASE_URL"]
     for var in env_vars:

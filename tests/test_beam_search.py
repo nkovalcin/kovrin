@@ -1,6 +1,5 @@
 """Tests for LATTICE Beam Search Executor."""
 
-import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -15,10 +14,7 @@ from kovrin.engine.graph import ExecutionGraph, NodeState
 
 
 def _make_candidate(n_tasks=2, score=0.8, prefix="t"):
-    tasks = [
-        SubTask(id=f"{prefix}_{i}", description=f"Task {i}")
-        for i in range(n_tasks)
-    ]
+    tasks = [SubTask(id=f"{prefix}_{i}", description=f"Task {i}") for i in range(n_tasks)]
     return DecompositionCandidate(
         subtasks=tasks,
         score=score,
@@ -182,9 +178,30 @@ class TestBeamPruning:
     def test_prune_lowest_beam(self):
         executor = BeamSearchExecutor(min_beams=1)
         beams = [
-            Beam(id="b1", decomposition=DecompositionCandidate(), graph=ExecutionGraph(), state=BeamState(), score=0.9, active=True),
-            Beam(id="b2", decomposition=DecompositionCandidate(), graph=ExecutionGraph(), state=BeamState(), score=0.3, active=True),
-            Beam(id="b3", decomposition=DecompositionCandidate(), graph=ExecutionGraph(), state=BeamState(), score=0.6, active=True),
+            Beam(
+                id="b1",
+                decomposition=DecompositionCandidate(),
+                graph=ExecutionGraph(),
+                state=BeamState(),
+                score=0.9,
+                active=True,
+            ),
+            Beam(
+                id="b2",
+                decomposition=DecompositionCandidate(),
+                graph=ExecutionGraph(),
+                state=BeamState(),
+                score=0.3,
+                active=True,
+            ),
+            Beam(
+                id="b3",
+                decomposition=DecompositionCandidate(),
+                graph=ExecutionGraph(),
+                state=BeamState(),
+                score=0.6,
+                active=True,
+            ),
         ]
         executor._prune_beams(beams)
         # Lowest (0.3) should be pruned
@@ -194,9 +211,30 @@ class TestBeamPruning:
     def test_prune_respects_min_beams(self):
         executor = BeamSearchExecutor(min_beams=3)
         beams = [
-            Beam(id="b1", decomposition=DecompositionCandidate(), graph=ExecutionGraph(), state=BeamState(), score=0.9, active=True),
-            Beam(id="b2", decomposition=DecompositionCandidate(), graph=ExecutionGraph(), state=BeamState(), score=0.3, active=True),
-            Beam(id="b3", decomposition=DecompositionCandidate(), graph=ExecutionGraph(), state=BeamState(), score=0.6, active=True),
+            Beam(
+                id="b1",
+                decomposition=DecompositionCandidate(),
+                graph=ExecutionGraph(),
+                state=BeamState(),
+                score=0.9,
+                active=True,
+            ),
+            Beam(
+                id="b2",
+                decomposition=DecompositionCandidate(),
+                graph=ExecutionGraph(),
+                state=BeamState(),
+                score=0.3,
+                active=True,
+            ),
+            Beam(
+                id="b3",
+                decomposition=DecompositionCandidate(),
+                graph=ExecutionGraph(),
+                state=BeamState(),
+                score=0.6,
+                active=True,
+            ),
         ]
         executor._prune_beams(beams)
         # All should remain active (min_beams=3)

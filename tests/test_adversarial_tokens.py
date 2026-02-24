@@ -9,8 +9,6 @@ Tests for:
 5. DCT scope escalation
 """
 
-import asyncio
-
 import pytest
 from pydantic import ValidationError
 
@@ -26,8 +24,8 @@ from kovrin.engine.graph import ExecutionGraph
 from kovrin.engine.tokens import ScopeViolationError, TokenAuthority
 from kovrin.intent.schema import IntentV2
 
-
 # ─── P2: Circular Dependency ─────────────────────────────
+
 
 @pytest.mark.adversarial
 class TestCircularDependency:
@@ -65,6 +63,7 @@ class TestCircularDependency:
 
 # ─── P2: Unbounded Decomposition ─────────────────────────
 
+
 @pytest.mark.adversarial
 class TestUnboundedDecomposition:
     """P2: Decomposition depth is bounded by IntentV2 model validation."""
@@ -96,6 +95,7 @@ class TestUnboundedDecomposition:
 
 # ─── P2: Subscriber Crash ────────────────────────────────
 
+
 @pytest.mark.adversarial
 class TestSubscriberCrash:
     """P2: Crashing subscriber does not corrupt trace log."""
@@ -116,12 +116,14 @@ class TestSubscriberCrash:
 
         # Append events through async path (which notifies subscribers)
         for i in range(5):
-            await log.append_async(Trace(
-                intent_id="intent-1",
-                task_id=f"t{i}",
-                event_type="TEST",
-                description=f"Event {i}",
-            ))
+            await log.append_async(
+                Trace(
+                    intent_id="intent-1",
+                    task_id=f"t{i}",
+                    event_type="TEST",
+                    description=f"Event {i}",
+                )
+            )
 
         # Subscriber was called but crashed
         assert crash_count == 5
@@ -133,6 +135,7 @@ class TestSubscriberCrash:
 
 
 # ─── P2: DCT Signature Forgery ───────────────────────────
+
 
 @pytest.mark.adversarial
 class TestDCTForgery:
@@ -175,6 +178,7 @@ class TestDCTForgery:
 
 
 # ─── P2: DCT Scope Escalation ────────────────────────────
+
 
 @pytest.mark.adversarial
 class TestDCTScopeEscalation:

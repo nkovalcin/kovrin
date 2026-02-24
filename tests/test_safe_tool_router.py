@@ -19,71 +19,93 @@ def _make_registry() -> ToolRegistry:
     """Create a registry with test tools at different risk levels."""
     registry = ToolRegistry()
 
-    registry.register(RegisteredTool(
-        definition=ToolDefinition(
-            name="safe_calc",
-            description="Calculator",
-            input_schema={"type": "object", "properties": {"expr": {"type": "string"}}, "required": ["expr"]},
-        ),
-        risk_profile=ToolRiskProfile(
-            risk_level=RiskLevel.LOW,
-            speculation_tier=SpeculationTier.FREE,
-            category=ToolCategory.COMPUTATION,
-            scope_tags=["computation"],
-            max_calls_per_task=5,
-        ),
-        handler=lambda expr: str(eval(expr, {"__builtins__": {}})),  # noqa: S307
-    ))
+    registry.register(
+        RegisteredTool(
+            definition=ToolDefinition(
+                name="safe_calc",
+                description="Calculator",
+                input_schema={
+                    "type": "object",
+                    "properties": {"expr": {"type": "string"}},
+                    "required": ["expr"],
+                },
+            ),
+            risk_profile=ToolRiskProfile(
+                risk_level=RiskLevel.LOW,
+                speculation_tier=SpeculationTier.FREE,
+                category=ToolCategory.COMPUTATION,
+                scope_tags=["computation"],
+                max_calls_per_task=5,
+            ),
+            handler=lambda expr: str(eval(expr, {"__builtins__": {}})),  # noqa: S307
+        )
+    )
 
-    registry.register(RegisteredTool(
-        definition=ToolDefinition(
-            name="risky_network",
-            description="HTTP request",
-            input_schema={"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]},
-        ),
-        risk_profile=ToolRiskProfile(
-            risk_level=RiskLevel.MEDIUM,
-            speculation_tier=SpeculationTier.GUARDED,
-            category=ToolCategory.NETWORK,
-            scope_tags=["network"],
-        ),
-        handler=lambda url: f"Fetched {url}",
-    ))
+    registry.register(
+        RegisteredTool(
+            definition=ToolDefinition(
+                name="risky_network",
+                description="HTTP request",
+                input_schema={
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "required": ["url"],
+                },
+            ),
+            risk_profile=ToolRiskProfile(
+                risk_level=RiskLevel.MEDIUM,
+                speculation_tier=SpeculationTier.GUARDED,
+                category=ToolCategory.NETWORK,
+                scope_tags=["network"],
+            ),
+            handler=lambda url: f"Fetched {url}",
+        )
+    )
 
-    registry.register(RegisteredTool(
-        definition=ToolDefinition(
-            name="danger_code",
-            description="Code execution",
-            input_schema={"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"]},
-        ),
-        risk_profile=ToolRiskProfile(
-            risk_level=RiskLevel.HIGH,
-            speculation_tier=SpeculationTier.GUARDED,
-            category=ToolCategory.CODE_EXECUTION,
-            scope_tags=["code_execution"],
-        ),
-        handler=lambda code: "executed",
-    ))
+    registry.register(
+        RegisteredTool(
+            definition=ToolDefinition(
+                name="danger_code",
+                description="Code execution",
+                input_schema={
+                    "type": "object",
+                    "properties": {"code": {"type": "string"}},
+                    "required": ["code"],
+                },
+            ),
+            risk_profile=ToolRiskProfile(
+                risk_level=RiskLevel.HIGH,
+                speculation_tier=SpeculationTier.GUARDED,
+                category=ToolCategory.CODE_EXECUTION,
+                scope_tags=["code_execution"],
+            ),
+            handler=lambda code: "executed",
+        )
+    )
 
-    registry.register(RegisteredTool(
-        definition=ToolDefinition(
-            name="critical_action",
-            description="Critical action",
-            input_schema={"type": "object", "properties": {}},
-        ),
-        risk_profile=ToolRiskProfile(
-            risk_level=RiskLevel.CRITICAL,
-            speculation_tier=SpeculationTier.NONE,
-            category=ToolCategory.EXTERNAL_API,
-            scope_tags=["critical"],
-        ),
-        handler=lambda: "done",
-    ))
+    registry.register(
+        RegisteredTool(
+            definition=ToolDefinition(
+                name="critical_action",
+                description="Critical action",
+                input_schema={"type": "object", "properties": {}},
+            ),
+            risk_profile=ToolRiskProfile(
+                risk_level=RiskLevel.CRITICAL,
+                speculation_tier=SpeculationTier.NONE,
+                category=ToolCategory.EXTERNAL_API,
+                scope_tags=["critical"],
+            ),
+            handler=lambda: "done",
+        )
+    )
 
     return registry
 
 
-def _make_router(registry: ToolRegistry | None = None, trace_log: ImmutableTraceLog | None = None) -> SafeToolRouter:
+def _make_router(
+    registry: ToolRegistry | None = None, trace_log: ImmutableTraceLog | None = None
+) -> SafeToolRouter:
     return SafeToolRouter(
         registry=registry or _make_registry(),
         risk_router=RiskRouter(),
@@ -206,22 +228,26 @@ class TestRateLimiting:
 
         # 5 calls from task t1
         for i in range(5):
-            await router.evaluate(ToolCallRequest(
-                tool_name="safe_calc",
-                tool_input={"expr": f"{i}"},
-                tool_use_id=f"tu-t1-{i}",
-                task_id="t1",
-                intent_id="i1",
-            ))
+            await router.evaluate(
+                ToolCallRequest(
+                    tool_name="safe_calc",
+                    tool_input={"expr": f"{i}"},
+                    tool_use_id=f"tu-t1-{i}",
+                    task_id="t1",
+                    intent_id="i1",
+                )
+            )
 
         # First call from task t2 should still be allowed
-        decision = await router.evaluate(ToolCallRequest(
-            tool_name="safe_calc",
-            tool_input={"expr": "1"},
-            tool_use_id="tu-t2-1",
-            task_id="t2",
-            intent_id="i1",
-        ))
+        decision = await router.evaluate(
+            ToolCallRequest(
+                tool_name="safe_calc",
+                tool_input={"expr": "1"},
+                tool_use_id="tu-t2-1",
+                task_id="t2",
+                intent_id="i1",
+            )
+        )
         assert decision.allowed is True
 
     @pytest.mark.asyncio
@@ -229,23 +255,27 @@ class TestRateLimiting:
         router = _make_router()
 
         for i in range(5):
-            await router.evaluate(ToolCallRequest(
-                tool_name="safe_calc",
-                tool_input={"expr": f"{i}"},
-                tool_use_id=f"tu-{i}",
-                task_id="t1",
-                intent_id="i1",
-            ))
+            await router.evaluate(
+                ToolCallRequest(
+                    tool_name="safe_calc",
+                    tool_input={"expr": f"{i}"},
+                    tool_use_id=f"tu-{i}",
+                    task_id="t1",
+                    intent_id="i1",
+                )
+            )
 
         router.reset_counts("t1")
 
-        decision = await router.evaluate(ToolCallRequest(
-            tool_name="safe_calc",
-            tool_input={"expr": "1"},
-            tool_use_id="tu-after-reset",
-            task_id="t1",
-            intent_id="i1",
-        ))
+        decision = await router.evaluate(
+            ToolCallRequest(
+                tool_name="safe_calc",
+                tool_input={"expr": "1"},
+                tool_use_id="tu-after-reset",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
         assert decision.allowed is True
 
 
@@ -270,6 +300,7 @@ class TestToolExecution:
     @pytest.mark.asyncio
     async def test_execute_blocked_tool_returns_error(self):
         from kovrin.tools.models import ToolCallDecision
+
         router = _make_router()
         request = ToolCallRequest(
             tool_name="safe_calc",
@@ -291,6 +322,7 @@ class TestToolExecution:
     @pytest.mark.asyncio
     async def test_execute_nonexistent_tool(self):
         from kovrin.tools.models import ToolCallDecision
+
         router = _make_router()
         request = ToolCallRequest(
             tool_name="ghost_tool",

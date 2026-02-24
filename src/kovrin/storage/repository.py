@@ -11,7 +11,7 @@ Schema:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from kovrin.core.models import (
     AutonomyProfile,
@@ -101,13 +101,24 @@ class PipelineRepository:
             hashed_traces: Optional list of dicts with keys: trace_id, hash, previous_hash, sequence.
                            If provided, hash chain data is stored alongside traces.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self._conn.upsert(
             "pipelines",
             "intent_id",
-            ["intent_id", "intent", "constraints", "context", "status", "success",
-             "output", "sub_tasks", "rejected_tasks", "graph_summary",
-             "created_at", "completed_at"],
+            [
+                "intent_id",
+                "intent",
+                "constraints",
+                "context",
+                "status",
+                "success",
+                "output",
+                "sub_tasks",
+                "rejected_tasks",
+                "graph_summary",
+                "created_at",
+                "completed_at",
+            ],
             (
                 result.intent_id,
                 intent,
@@ -142,8 +153,20 @@ class PipelineRepository:
         self._conn.upsert(
             "traces",
             "id",
-            ["id", "intent_id", "task_id", "event_type", "description", "details",
-             "risk_level", "l0_passed", "timestamp", "hash", "previous_hash", "sequence"],
+            [
+                "id",
+                "intent_id",
+                "task_id",
+                "event_type",
+                "description",
+                "details",
+                "risk_level",
+                "l0_passed",
+                "timestamp",
+                "hash",
+                "previous_hash",
+                "sequence",
+            ],
             (
                 trace.id,
                 intent_id,
@@ -232,7 +255,9 @@ class PipelineRepository:
             details=json.loads(row["details"]) if row["details"] else {},
             risk_level=risk,
             l0_passed=l0,
-            timestamp=datetime.fromisoformat(row["timestamp"]) if row["timestamp"] else datetime.now(timezone.utc),
+            timestamp=datetime.fromisoformat(row["timestamp"])
+            if row["timestamp"]
+            else datetime.now(UTC),
         )
 
     def _parse_subtasks(self, data: str) -> list[SubTask]:
@@ -268,7 +293,9 @@ class PipelineRepository:
         return AutonomySettings(
             profile=AutonomyProfile(row["profile"]),
             override_matrix=json.loads(row["override_matrix"]) if row["override_matrix"] else {},
-            updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(row["updated_at"])
+            if row["updated_at"]
+            else datetime.now(UTC),
         )
 
     def get_traces_with_hashes(self, intent_id: str) -> list[dict]:

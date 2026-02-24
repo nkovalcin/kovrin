@@ -12,9 +12,8 @@ import asyncio
 
 import pytest
 
-from kovrin.audit.trace_logger import ImmutableTraceLog, HashedTrace
+from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
 from kovrin.core.models import Trace
-
 
 # ─── Helpers ────────────────────────────────────────────────
 
@@ -156,13 +155,15 @@ async def test_subscriber_receives_trace_fields():
         received.append(hashed)
 
     log.subscribe(callback)
-    await log.append_async(make_trace(
-        intent_id="intent-123",
-        task_id="task-456",
-        event_type="EXECUTION_START",
-        description="Starting execution",
-        details={"wave": 1, "tasks": ["a", "b"]},
-    ))
+    await log.append_async(
+        make_trace(
+            intent_id="intent-123",
+            task_id="task-456",
+            event_type="EXECUTION_START",
+            description="Starting execution",
+            details={"wave": 1, "tasks": ["a", "b"]},
+        )
+    )
 
     assert len(received) == 1
     t = received[0].trace
@@ -194,28 +195,32 @@ async def test_broadcast_trace_data_shape():
 
     async def ws_broadcast(hashed: HashedTrace) -> None:
         t = hashed.trace
-        broadcast_messages.append({
-            "type": "trace",
-            "intent_id": t.intent_id,
-            "data": {
-                "id": t.id,
-                "timestamp": t.timestamp.isoformat(),
+        broadcast_messages.append(
+            {
+                "type": "trace",
                 "intent_id": t.intent_id,
-                "task_id": t.task_id,
-                "event_type": t.event_type,
-                "description": t.description,
-                "details": t.details or {},
-                "risk_level": t.risk_level.value if t.risk_level else None,
-                "l0_passed": t.l0_passed,
-            },
-        })
+                "data": {
+                    "id": t.id,
+                    "timestamp": t.timestamp.isoformat(),
+                    "intent_id": t.intent_id,
+                    "task_id": t.task_id,
+                    "event_type": t.event_type,
+                    "description": t.description,
+                    "details": t.details or {},
+                    "risk_level": t.risk_level.value if t.risk_level else None,
+                    "l0_passed": t.l0_passed,
+                },
+            }
+        )
 
     log.subscribe(ws_broadcast)
-    await log.append_async(make_trace(
-        intent_id="ws-test",
-        event_type="INTENT_RECEIVED",
-        description="WS test intent",
-    ))
+    await log.append_async(
+        make_trace(
+            intent_id="ws-test",
+            event_type="INTENT_RECEIVED",
+            description="WS test intent",
+        )
+    )
 
     assert len(broadcast_messages) == 1
     msg = broadcast_messages[0]

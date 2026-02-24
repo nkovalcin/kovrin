@@ -18,12 +18,13 @@ from dataclasses import dataclass
 
 import anthropic
 
-from kovrin.core.models import ProofObligation, RiskLevel, SubTask, Trace
+from kovrin.core.models import ProofObligation, SubTask, Trace
 
 
 @dataclass(frozen=True)
 class Axiom:
     """A single immutable ethical axiom."""
+
     id: int
     name: str
     description: str
@@ -68,7 +69,10 @@ AXIOMS: tuple[Axiom, ...] = (
 def _compute_axiom_hash(axioms: tuple[Axiom, ...]) -> str:
     """Compute SHA-256 integrity hash of the axiom set."""
     content = json.dumps(
-        [{"id": a.id, "name": a.name, "description": a.description, "formal": a.formal} for a in axioms],
+        [
+            {"id": a.id, "name": a.name, "description": a.description, "formal": a.formal}
+            for a in axioms
+        ],
         sort_keys=True,
     )
     return hashlib.sha256(content.encode()).hexdigest()

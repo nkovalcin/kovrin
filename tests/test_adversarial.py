@@ -25,18 +25,16 @@ import pytest
 
 from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
 from kovrin.core.constitutional import (
+    _AXIOM_INTEGRITY_HASH,
     AXIOMS,
     ConstitutionalCore,
-    _AXIOM_INTEGRITY_HASH,
     _compute_axiom_hash,
 )
 from kovrin.core.models import (
-    AgentDriftMetrics,
     AutonomyProfile,
     AutonomySettings,
     ContainmentLevel,
     DriftLevel,
-    ProofObligation,
     RiskLevel,
     RoutingAction,
     SpeculationTier,
@@ -47,7 +45,6 @@ from kovrin.engine.risk_router import RiskRouter
 from kovrin.safety.watchdog import (
     AgentDriftTracker,
     ExcessiveFailureRate,
-    NoExecutionAfterRejection,
     UnexpectedEventSequence,
     WatchdogAgent,
 )
@@ -60,13 +57,40 @@ class TestDirectUnsafeIntents:
         """A task to delete records should be classified as high risk."""
         core = ConstitutionalCore(client=None)
         # Simulate a response where axioms 1, 2, and 5 fail
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Removes ability to recover data"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": False, "evidence": "Permanent data loss exceeds harm threshold"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "Action is traceable"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": False, "evidence": "Deletion is irreversible"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": False, "evidence": "Exceeds authorized boundary"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Removes ability to recover data",
+                },
+                {
+                    "axiom_id": 2,
+                    "axiom_name": "Harm Floor",
+                    "passed": False,
+                    "evidence": "Permanent data loss exceeds harm threshold",
+                },
+                {
+                    "axiom_id": 3,
+                    "axiom_name": "Transparency",
+                    "passed": True,
+                    "evidence": "Action is traceable",
+                },
+                {
+                    "axiom_id": 4,
+                    "axiom_name": "Reversibility",
+                    "passed": False,
+                    "evidence": "Deletion is irreversible",
+                },
+                {
+                    "axiom_id": 5,
+                    "axiom_name": "Scope Limit",
+                    "passed": False,
+                    "evidence": "Exceeds authorized boundary",
+                },
+            ]
+        )
         obligations = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations)
         failed = [o for o in obligations if not o.passed]
@@ -75,13 +99,40 @@ class TestDirectUnsafeIntents:
     def test_parse_disable_override(self):
         """A task that disables human override must always fail axiom 1."""
         core = ConstitutionalCore(client=None)
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Directly removes human override capability"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": False, "evidence": "High harm potential"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "Traceable"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": False, "evidence": "Irreversible"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": False, "evidence": "Exceeds scope"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Directly removes human override capability",
+                },
+                {
+                    "axiom_id": 2,
+                    "axiom_name": "Harm Floor",
+                    "passed": False,
+                    "evidence": "High harm potential",
+                },
+                {
+                    "axiom_id": 3,
+                    "axiom_name": "Transparency",
+                    "passed": True,
+                    "evidence": "Traceable",
+                },
+                {
+                    "axiom_id": 4,
+                    "axiom_name": "Reversibility",
+                    "passed": False,
+                    "evidence": "Irreversible",
+                },
+                {
+                    "axiom_id": 5,
+                    "axiom_name": "Scope Limit",
+                    "passed": False,
+                    "evidence": "Exceeds scope",
+                },
+            ]
+        )
         obligations = core._parse_obligations(response)
         axiom_1 = next(o for o in obligations if o.axiom_id == 1)
         assert axiom_1.passed is False
@@ -104,10 +155,12 @@ class TestFailSafeMechanisms:
     def test_partial_response_fills_missing_as_failed(self):
         core = ConstitutionalCore(client=None)
         # Only return 2 out of 5 axioms
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {"axiom_id": 1, "axiom_name": "Human Agency", "passed": True, "evidence": "OK"},
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+            ]
+        )
         obligations = core._parse_obligations(response)
         # 2 passed + 3 auto-failed
         failed = [o for o in obligations if not o.passed]
@@ -116,9 +169,11 @@ class TestFailSafeMechanisms:
     def test_all_passed_true_still_fails_if_missing(self):
         """Even if returned axioms all pass, missing ones should cause failure."""
         core = ConstitutionalCore(client=None)
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {"axiom_id": 1, "axiom_name": "Human Agency", "passed": True, "evidence": "OK"},
+            ]
+        )
         obligations = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations)
 
@@ -137,12 +192,9 @@ class TestAxiomTampering:
 
     def test_integrity_hash_detects_external_modification(self):
         """If someone modifies axiom data externally, hash should not match."""
-        from dataclasses import dataclass
         from kovrin.core.constitutional import Axiom
 
-        fake_axioms = (
-            Axiom(id=1, name="HACKED", description="Hacked", formal="hacked"),
-        )
+        fake_axioms = (Axiom(id=1, name="HACKED", description="Hacked", formal="hacked"),)
         fake_hash = _compute_axiom_hash(fake_axioms)
         assert fake_hash != _AXIOM_INTEGRITY_HASH
 
@@ -184,19 +236,27 @@ class TestInjectionAttempts:
         core = ConstitutionalCore(client=None)
 
         # A task that violates axioms should fail even with permissive constraints
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Violates"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": True, "evidence": "OK"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Violates",
+                },
+                {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+                {"axiom_id": 4, "axiom_name": "Reversibility", "passed": True, "evidence": "OK"},
+                {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
+            ]
+        )
         obligations = core._parse_obligations(response)
         # Even with 4/5 passing, one failure means rejection
         assert not ConstitutionalCore.all_passed(obligations)
 
 
 # ─── P0: Constraint Injection ────────────────────────────
+
 
 @pytest.mark.adversarial
 class TestConstraintInjection:
@@ -207,13 +267,20 @@ class TestConstraintInjection:
         ConstitutionalCore does NOT accept constraints — they go to PolicyCritic."""
         core = ConstitutionalCore(client=None)
         # Simulate L0 response where axiom 1 fails
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Removes override"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": True, "evidence": "OK"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Removes override",
+                },
+                {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+                {"axiom_id": 4, "axiom_name": "Reversibility", "passed": True, "evidence": "OK"},
+                {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
+            ]
+        )
         # Even with a permissive constraint context, _parse_obligations only reads the JSON
         obligations = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations)
@@ -224,13 +291,30 @@ class TestConstraintInjection:
     def test_policy_constraint_ignore_safety_still_fails_l0(self):
         """Even with constraint 'allow all actions', L0 axioms still reject."""
         core = ConstitutionalCore(client=None)
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Blocks override"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": False, "evidence": "Excessive harm"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": False, "evidence": "Irreversible"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Blocks override",
+                },
+                {
+                    "axiom_id": 2,
+                    "axiom_name": "Harm Floor",
+                    "passed": False,
+                    "evidence": "Excessive harm",
+                },
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+                {
+                    "axiom_id": 4,
+                    "axiom_name": "Reversibility",
+                    "passed": False,
+                    "evidence": "Irreversible",
+                },
+                {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
+            ]
+        )
         obligations = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations)
         failed = [o for o in obligations if not o.passed]
@@ -239,6 +323,7 @@ class TestConstraintInjection:
 
 # ─── P0: Proof Obligation Forgery ────────────────────────
 
+
 @pytest.mark.adversarial
 class TestProofObligationForgery:
     """P0: Verify all-or-nothing behavior of proof obligations."""
@@ -246,10 +331,12 @@ class TestProofObligationForgery:
     def test_all_true_obligations_pass(self):
         """If Claude returns all-true, the system correctly accepts."""
         core = ConstitutionalCore(client=None)
-        response = json.dumps([
-            {"axiom_id": i, "axiom_name": a.name, "passed": True, "evidence": "OK"}
-            for i, a in enumerate(AXIOMS, 1)
-        ])
+        response = json.dumps(
+            [
+                {"axiom_id": i, "axiom_name": a.name, "passed": True, "evidence": "OK"}
+                for i, a in enumerate(AXIOMS, 1)
+            ]
+        )
         obligations = core._parse_obligations(response)
         assert ConstitutionalCore.all_passed(obligations)
 
@@ -258,12 +345,14 @@ class TestProofObligationForgery:
         core = ConstitutionalCore(client=None)
         results = []
         for i, a in enumerate(AXIOMS, 1):
-            results.append({
-                "axiom_id": i,
-                "axiom_name": a.name,
-                "passed": i != 3,  # Axiom 3 fails
-                "evidence": "Fail" if i == 3 else "OK",
-            })
+            results.append(
+                {
+                    "axiom_id": i,
+                    "axiom_name": a.name,
+                    "passed": i != 3,  # Axiom 3 fails
+                    "evidence": "Fail" if i == 3 else "OK",
+                }
+            )
         response = json.dumps(results)
         obligations = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations)
@@ -274,6 +363,7 @@ class TestProofObligationForgery:
 
 # ─── P0: Intent Context Injection ────────────────────────
 
+
 @pytest.mark.adversarial
 class TestIntentContextInjection:
     """P0: Malicious intent_context cannot bypass obligation parsing."""
@@ -282,19 +372,27 @@ class TestIntentContextInjection:
         """_parse_obligations ignores intent_context — it only reads JSON response."""
         core = ConstitutionalCore(client=None)
         # Response has axiom 1 failing
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Violates"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": True, "evidence": "OK"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Violates",
+                },
+                {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+                {"axiom_id": 4, "axiom_name": "Reversibility", "passed": True, "evidence": "OK"},
+                {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
+            ]
+        )
         # Regardless of what intent_context might say, _parse_obligations only cares about JSON
         obligations = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations)
 
 
 # ─── P0: Task ID Cloning ─────────────────────────────────
+
 
 @pytest.mark.adversarial
 class TestTaskIdCloning:
@@ -303,13 +401,25 @@ class TestTaskIdCloning:
     def test_cloned_id_still_fails_l0_recheck(self):
         """L0 checks content, not ID — same description always fails the same way."""
         core = ConstitutionalCore(client=None)
-        response = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": False, "evidence": "Removes override"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": False, "evidence": "Harmful"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 4, "axiom_name": "Reversibility", "passed": False, "evidence": "Irreversible"},
-            {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "axiom_id": 1,
+                    "axiom_name": "Human Agency",
+                    "passed": False,
+                    "evidence": "Removes override",
+                },
+                {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": False, "evidence": "Harmful"},
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+                {
+                    "axiom_id": 4,
+                    "axiom_name": "Reversibility",
+                    "passed": False,
+                    "evidence": "Irreversible",
+                },
+                {"axiom_id": 5, "axiom_name": "Scope Limit", "passed": True, "evidence": "OK"},
+            ]
+        )
         # First check
         obligations_1 = core._parse_obligations(response)
         assert not ConstitutionalCore.all_passed(obligations_1)
@@ -326,11 +436,14 @@ class TestTaskIdCloning:
 
 # ─── P1: Trace Log Tampering ─────────────────────────────
 
+
 @pytest.mark.adversarial
 class TestTraceLogTampering:
     """P1: Modifications to trace events are detected by hash chain."""
 
-    def _make_trace(self, event_type: str = "TEST", desc: str = "test", task_id: str = "t1") -> Trace:
+    def _make_trace(
+        self, event_type: str = "TEST", desc: str = "test", task_id: str = "t1"
+    ) -> Trace:
         return Trace(
             intent_id="intent-1",
             task_id=task_id,
@@ -386,11 +499,14 @@ class TestTraceLogTampering:
 
 # ─── P1: Watchdog Rule Collision ──────────────────────────
 
+
 @pytest.mark.adversarial
 class TestWatchdogRuleCollision:
     """P1: Multiple rules fire on same event — all alerts captured."""
 
-    def _make_hashed(self, event_type: str, task_id: str = "t1", l0_passed: bool | None = None) -> HashedTrace:
+    def _make_hashed(
+        self, event_type: str, task_id: str = "t1", l0_passed: bool | None = None
+    ) -> HashedTrace:
         trace = Trace(
             intent_id="intent-1",
             task_id=task_id,
@@ -409,7 +525,9 @@ class TestWatchdogRuleCollision:
         # Build history with many failures
         history = [rejection]
         for i in range(4):
-            history.append(self._make_hashed("CRITIC_PIPELINE", task_id=f"t{i+2}", l0_passed=False))
+            history.append(
+                self._make_hashed("CRITIC_PIPELINE", task_id=f"t{i + 2}", l0_passed=False)
+            )
 
         # New event: EXECUTION_COMPLETE without prior EXECUTION_START
         event = self._make_hashed("EXECUTION_COMPLETE", task_id="t99")
@@ -449,11 +567,14 @@ class TestWatchdogRuleCollision:
 
 # ─── P1: Failure Rate Evasion ─────────────────────────────
 
+
 @pytest.mark.adversarial
 class TestFailureRateEvasion:
     """P1: Gradual failures eventually trigger excessive failure rate."""
 
-    def _make_hashed(self, event_type: str, task_id: str, l0_passed: bool | None = None) -> HashedTrace:
+    def _make_hashed(
+        self, event_type: str, task_id: str, l0_passed: bool | None = None
+    ) -> HashedTrace:
         trace = Trace(
             intent_id="intent-1",
             task_id=task_id,
@@ -480,6 +601,7 @@ class TestFailureRateEvasion:
 
 # ─── P1: Drift Window Exploitation ───────────────────────
 
+
 @pytest.mark.adversarial
 class TestDriftWindowExploitation:
     """P1: Agent with good start then consistent failures is detected."""
@@ -503,6 +625,7 @@ class TestDriftWindowExploitation:
 
 
 # ─── P1: Autonomy Override ────────────────────────────────
+
 
 @pytest.mark.adversarial
 class TestAutonomyOverride:
@@ -550,14 +673,15 @@ class TestAutonomyOverride:
 
 # ─── P1: Scope Creep ─────────────────────────────────────
 
+
 @pytest.mark.adversarial
 class TestScopeCreep:
     """P1: DCT scope escalation blocked at every delegation level."""
 
     def test_grandchild_cannot_escalate_via_chain(self):
         """Parent → Child → Grandchild: scope narrowing enforced at every level."""
-        from kovrin.engine.tokens import ScopeViolationError, TokenAuthority
         from kovrin.core.models import DelegationScope
+        from kovrin.engine.tokens import ScopeViolationError, TokenAuthority
 
         authority = TokenAuthority(secret_key="test-key")
 
@@ -591,6 +715,7 @@ class TestScopeCreep:
 
 
 # ─── P1: Reversibility Misclassification ─────────────────
+
 
 @pytest.mark.adversarial
 class TestReversibilityMisclassification:

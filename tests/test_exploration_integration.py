@@ -6,8 +6,7 @@ Verifies that:
 3. New parameters integrate correctly with the Kovrin orchestrator
 """
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -94,9 +93,7 @@ class TestExplorationPipeline:
         )
 
         # Mock MCTS explorer
-        engine._mcts.explore = AsyncMock(
-            return_value=(best_candidate, [best_candidate])
-        )
+        engine._mcts.explore = AsyncMock(return_value=(best_candidate, [best_candidate]))
 
         # Mock critics to approve all
         engine._critics.evaluate = AsyncMock(return_value=(True, []))
@@ -135,9 +132,7 @@ class TestExplorationPipeline:
         engine._critics.evaluate = AsyncMock(return_value=(True, []))
 
         # Mock executor
-        engine._graph_executor.execute = AsyncMock(
-            return_value={"t-1": "Done"}
-        )
+        engine._graph_executor.execute = AsyncMock(return_value={"t-1": "Done"})
 
         result = await engine.run(intent="Do some work")
 

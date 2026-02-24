@@ -16,7 +16,7 @@ from kovrin.agents.tools import ToolDefinition
 from kovrin.core.models import RiskLevel, SpeculationTier
 from kovrin.tools.models import ToolCategory, ToolRiskProfile
 from kovrin.tools.registry import RegisteredTool
-from kovrin.tools.sandbox import SandboxedExecutor, SandboxConfig
+from kovrin.tools.sandbox import SandboxedExecutor
 
 _sandbox = SandboxedExecutor()
 

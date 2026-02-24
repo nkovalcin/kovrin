@@ -60,7 +60,9 @@ class SafetyBlockedError(KovrinError):
     Contains information about which critics failed and why.
     """
 
-    def __init__(self, message: str, failed_critics: list[str] | None = None, details: dict | None = None):
+    def __init__(
+        self, message: str, failed_critics: list[str] | None = None, details: dict | None = None
+    ):
         super().__init__(
             message,
             details={"failed_critics": failed_critics or [], **(details or {})},

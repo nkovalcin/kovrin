@@ -6,20 +6,21 @@ Tier: GUARDED — responses can be inspected before committing.
 
 from __future__ import annotations
 
-import json
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from kovrin.agents.tools import ToolDefinition
 from kovrin.core.models import RiskLevel, SpeculationTier
 from kovrin.tools.models import ToolCategory, ToolRiskProfile
 from kovrin.tools.registry import RegisteredTool
-from kovrin.tools.sandbox import SandboxedExecutor, SandboxConfig
+from kovrin.tools.sandbox import SandboxConfig, SandboxedExecutor
 
-_sandbox = SandboxedExecutor(SandboxConfig(
-    timeout_seconds=15.0,
-    network_allowed=True,
-))
+_sandbox = SandboxedExecutor(
+    SandboxConfig(
+        timeout_seconds=15.0,
+        network_allowed=True,
+    )
+)
 
 
 async def _http_request(

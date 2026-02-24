@@ -6,8 +6,6 @@ Tests the CLI commands using subprocess to avoid import side effects.
 import subprocess
 import sys
 
-import pytest
-
 
 class TestCLIBasic:
     """Basic CLI invocation tests."""
@@ -72,10 +70,12 @@ class TestCLIImports:
 
     def test_cli_importable(self):
         from kovrin.cli import cli
+
         assert callable(cli)
 
     def test_internal_functions_exist(self):
-        from kovrin.cli import _run_pipeline, _audit, _verify, _serve, _status
+        from kovrin.cli import _audit, _run_pipeline, _serve, _status, _verify
+
         assert callable(_run_pipeline)
         assert callable(_audit)
         assert callable(_verify)

@@ -10,14 +10,15 @@ locally when the agent makes tool calls.
 
 import json
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable
+from datetime import UTC, datetime
 
 
 @dataclass
 class ToolDefinition:
     """A tool that can be used by agents."""
+
     name: str
     description: str
     input_schema: dict = field(default_factory=dict)
@@ -26,6 +27,7 @@ class ToolDefinition:
 @dataclass
 class ToolResult:
     """Result of executing a tool."""
+
     tool_use_id: str
     content: str
     is_error: bool = False
@@ -90,12 +92,23 @@ class ToolExecutor:
 def _calculator(expression: str) -> str:
     """Evaluate a mathematical expression safely."""
     allowed_names = {
-        "abs": abs, "round": round, "min": min, "max": max,
-        "sum": sum, "pow": pow, "len": len,
-        "sqrt": math.sqrt, "log": math.log, "log10": math.log10,
-        "sin": math.sin, "cos": math.cos, "tan": math.tan,
-        "pi": math.pi, "e": math.e,
-        "ceil": math.ceil, "floor": math.floor,
+        "abs": abs,
+        "round": round,
+        "min": min,
+        "max": max,
+        "sum": sum,
+        "pow": pow,
+        "len": len,
+        "sqrt": math.sqrt,
+        "log": math.log,
+        "log10": math.log10,
+        "sin": math.sin,
+        "cos": math.cos,
+        "tan": math.tan,
+        "pi": math.pi,
+        "e": math.e,
+        "ceil": math.ceil,
+        "floor": math.floor,
     }
     try:
         result = eval(expression, {"__builtins__": {}}, allowed_names)
@@ -106,7 +119,7 @@ def _calculator(expression: str) -> str:
 
 def _current_datetime() -> str:
     """Return the current date and time in ISO format."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _json_formatter(data: str) -> str:

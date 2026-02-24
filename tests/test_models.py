@@ -1,7 +1,5 @@
 """Tests for LATTICE core data models."""
 
-import pytest
-
 from kovrin.core.models import (
     ExecutionResult,
     ProofObligation,

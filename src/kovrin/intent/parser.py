@@ -40,8 +40,12 @@ class IntentParser:
         Uses structured output parsing to extract sub-tasks
         with dependencies, risk levels, and speculation tiers.
         """
-        constraints_text = "\n".join(f"  - {c}" for c in intent.constraints) if intent.constraints else "  None"
-        context_text = json.dumps(intent.context, indent=2, default=str) if intent.context else "  None"
+        constraints_text = (
+            "\n".join(f"  - {c}" for c in intent.constraints) if intent.constraints else "  None"
+        )
+        context_text = (
+            json.dumps(intent.context, indent=2, default=str) if intent.context else "  None"
+        )
 
         prompt = f"""You are the intent decomposition engine for Kovrin, a safety-first AI orchestration framework.
 
@@ -99,20 +103,24 @@ Return ONLY the JSON array, no other text."""
 
         if start == -1 or end == 0:
             # Fallback: create a single task from the entire intent
-            return [SubTask(
-                description="Execute the intent as a single task (decomposition failed)",
-                risk_level=RiskLevel.MEDIUM,
-                parent_intent_id=intent_id,
-            )]
+            return [
+                SubTask(
+                    description="Execute the intent as a single task (decomposition failed)",
+                    risk_level=RiskLevel.MEDIUM,
+                    parent_intent_id=intent_id,
+                )
+            ]
 
         try:
             tasks_data = json.loads(text[start:end])
         except json.JSONDecodeError:
-            return [SubTask(
-                description="Execute the intent as a single task (JSON parse failed)",
-                risk_level=RiskLevel.MEDIUM,
-                parent_intent_id=intent_id,
-            )]
+            return [
+                SubTask(
+                    description="Execute the intent as a single task (JSON parse failed)",
+                    risk_level=RiskLevel.MEDIUM,
+                    parent_intent_id=intent_id,
+                )
+            ]
 
         subtasks = []
         for item in tasks_data:
@@ -128,13 +136,15 @@ Return ONLY the JSON array, no other text."""
             except ValueError:
                 pass
 
-            subtasks.append(SubTask(
-                id=item.get("id", f"task_{len(subtasks)}"),
-                description=item.get("description", "Unknown task"),
-                risk_level=risk,
-                speculation_tier=tier,
-                dependencies=item.get("dependencies", []),
-                parent_intent_id=intent_id,
-            ))
+            subtasks.append(
+                SubTask(
+                    id=item.get("id", f"task_{len(subtasks)}"),
+                    description=item.get("description", "Unknown task"),
+                    risk_level=risk,
+                    speculation_tier=tier,
+                    dependencies=item.get("dependencies", []),
+                    parent_intent_id=intent_id,
+                )
+            )
 
         return subtasks

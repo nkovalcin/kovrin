@@ -18,7 +18,6 @@ import anthropic
 
 from kovrin.core.models import PrmScore, PrmStepScore, SubTask, Trace
 
-
 _PRM_PROMPT = """You are a Process Reward Model evaluating the quality of each reasoning step in an AI-generated output.
 
 TASK DESCRIPTION: {task_description}
@@ -113,12 +112,14 @@ class ProcessRewardModel:
 
         step_scores: list[PrmStepScore] = []
         for step in data.get("steps", []):
-            step_scores.append(PrmStepScore(
-                step_index=step.get("step_index", len(step_scores)),
-                description=step.get("description", ""),
-                score=max(0.0, min(1.0, float(step.get("score", 0.5)))),
-                reasoning=step.get("reasoning", ""),
-            ))
+            step_scores.append(
+                PrmStepScore(
+                    step_index=step.get("step_index", len(step_scores)),
+                    description=step.get("description", ""),
+                    score=max(0.0, min(1.0, float(step.get("score", 0.5)))),
+                    reasoning=step.get("reasoning", ""),
+                )
+            )
 
         aggregate = self._weighted_aggregate(step_scores)
         overall_reasoning = data.get("overall_reasoning", "")

@@ -1,7 +1,7 @@
 """Tests for LATTICE Confidence Estimation."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -14,10 +14,12 @@ def _mock_client(confidence=0.85, reasoning="Looks good"):
     client = AsyncMock()
     response = MagicMock()
     response.content = [MagicMock()]
-    response.content[0].text = json.dumps({
-        "confidence": confidence,
-        "reasoning": reasoning,
-    })
+    response.content[0].text = json.dumps(
+        {
+            "confidence": confidence,
+            "reasoning": reasoning,
+        }
+    )
     client.messages.create = AsyncMock(return_value=response)
     return client
 

@@ -19,7 +19,7 @@ Features:
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -29,6 +29,7 @@ from kovrin.core.models import Trace
 
 class HashedTrace(BaseModel):
     """A trace event with Merkle-tree hash chaining."""
+
     trace: Trace
     hash: str = Field(..., description="SHA-256 hash of this event + previous hash")
     previous_hash: str = Field("GENESIS", description="Hash of the previous event")
@@ -63,7 +64,6 @@ class ImmutableTraceLog:
 
     async def _notify_subscribers(self, hashed: HashedTrace) -> None:
         """Notify all subscribers of a new event."""
-        import asyncio
         for callback in self._subscribers:
             try:
                 await callback(hashed)
@@ -79,17 +79,21 @@ class ImmutableTraceLog:
         sequence = len(self._events)
 
         # Create hash of event content + previous hash
-        content = json.dumps({
-            "id": trace.id,
-            "timestamp": trace.timestamp.isoformat(),
-            "intent_id": trace.intent_id,
-            "task_id": trace.task_id,
-            "event_type": trace.event_type,
-            "description": trace.description,
-            "details": trace.details,
-            "previous_hash": self._current_hash,
-            "sequence": sequence,
-        }, sort_keys=True, default=str)
+        content = json.dumps(
+            {
+                "id": trace.id,
+                "timestamp": trace.timestamp.isoformat(),
+                "intent_id": trace.intent_id,
+                "task_id": trace.task_id,
+                "event_type": trace.event_type,
+                "description": trace.description,
+                "details": trace.details,
+                "previous_hash": self._current_hash,
+                "sequence": sequence,
+            },
+            sort_keys=True,
+            default=str,
+        )
 
         event_hash = hashlib.sha256(content.encode()).hexdigest()
 
@@ -136,17 +140,21 @@ class ImmutableTraceLog:
                 )
 
             # Recompute hash
-            content = json.dumps({
-                "id": event.trace.id,
-                "timestamp": event.trace.timestamp.isoformat(),
-                "intent_id": event.trace.intent_id,
-                "task_id": event.trace.task_id,
-                "event_type": event.trace.event_type,
-                "description": event.trace.description,
-                "details": event.trace.details,
-                "previous_hash": event.previous_hash,
-                "sequence": event.sequence,
-            }, sort_keys=True, default=str)
+            content = json.dumps(
+                {
+                    "id": event.trace.id,
+                    "timestamp": event.trace.timestamp.isoformat(),
+                    "intent_id": event.trace.intent_id,
+                    "task_id": event.trace.task_id,
+                    "event_type": event.trace.event_type,
+                    "description": event.trace.description,
+                    "details": event.trace.details,
+                    "previous_hash": event.previous_hash,
+                    "sequence": event.sequence,
+                },
+                sort_keys=True,
+                default=str,
+            )
 
             recomputed = hashlib.sha256(content.encode()).hexdigest()
 
@@ -180,7 +188,7 @@ class ImmutableTraceLog:
     def export_json(self, path: str | Path) -> None:
         """Export the full log as JSON for external audit."""
         data = {
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "total_events": len(self._events),
             "chain_head": self._current_hash,
             "events": [
@@ -209,16 +217,18 @@ class ImmutableTraceLog:
         """Print a human-readable summary of the trace log."""
         valid, msg = self.verify_integrity()
         icon = "+" if valid else "x"
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"IMMUTABLE TRACE LOG — {len(self._events)} events")
         print(f"Chain integrity: {icon} {msg}")
         print(f"Chain head: {self._current_hash[:32]}...")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         for e in self._events:
             risk = f"[{e.trace.risk_level.value}]" if e.trace.risk_level else "[---]"
             l0 = "+L0" if e.trace.l0_passed else ("xL0" if e.trace.l0_passed is False else "   ")
-            print(f"  #{e.sequence:3d} {e.hash[:8]} {risk:8s} {l0} {e.trace.event_type:18s} {e.trace.description[:50]}")
+            print(
+                f"  #{e.sequence:3d} {e.hash[:8]} {risk:8s} {l0} {e.trace.event_type:18s} {e.trace.description[:50]}"
+            )
 
     def get_events_since(self, sequence: int) -> list[HashedTrace]:
         """Return all events from the given sequence onward (inclusive)."""

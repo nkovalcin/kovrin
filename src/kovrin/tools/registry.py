@@ -11,9 +11,10 @@ tools for a specific agent/token combination.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from kovrin.agents.tools import ToolDefinition, ToolResult
+from kovrin.agents.tools import ToolDefinition
 from kovrin.core.models import DelegationScope, RiskLevel, SpeculationTier, SubTask
 from kovrin.tools.models import ToolCategory, ToolRiskProfile
 
@@ -132,10 +133,7 @@ class ToolRegistry:
         risk_order = [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL]
         max_idx = risk_order.index(subtask.risk_level) if subtask.risk_level in risk_order else 0
 
-        eligible = [
-            t for t in self._tools.values()
-            if risk_order.index(t.risk_level) <= max_idx
-        ]
+        eligible = [t for t in self._tools.values() if risk_order.index(t.risk_level) <= max_idx]
         return self.get_schemas(eligible)
 
     def __len__(self) -> int:

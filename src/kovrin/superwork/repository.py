@@ -156,9 +156,21 @@ class SuperWorkRepository:
         self._conn.upsert(
             "superwork_proposals",
             "id",
-            ["id", "session_id", "title", "description", "rationale",
-             "risk_level", "estimated_tokens", "auto_execute",
-             "dependencies", "status", "priority", "created_at", "resolved_at"],
+            [
+                "id",
+                "session_id",
+                "title",
+                "description",
+                "rationale",
+                "risk_level",
+                "estimated_tokens",
+                "auto_execute",
+                "dependencies",
+                "status",
+                "priority",
+                "created_at",
+                "resolved_at",
+            ],
             (
                 proposal.id,
                 session_id,
@@ -264,8 +276,16 @@ class SuperWorkRepository:
         self._conn.upsert(
             "superwork_events",
             "id",
-            ["id", "session_id", "completed_task", "output_summary",
-             "files_changed", "errors", "duration_seconds", "timestamp"],
+            [
+                "id",
+                "session_id",
+                "completed_task",
+                "output_summary",
+                "files_changed",
+                "errors",
+                "duration_seconds",
+                "timestamp",
+            ],
             (
                 event.id,
                 session_id,

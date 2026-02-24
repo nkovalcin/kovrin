@@ -6,10 +6,8 @@ and watchdog lifecycle (start/stop).
 
 import asyncio
 
-import pytest
-
 from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
-from kovrin.core.models import ContainmentLevel, RiskLevel, Trace, WatchdogAlert
+from kovrin.core.models import ContainmentLevel, Trace
 from kovrin.safety.watchdog import (
     DEFAULT_RULES,
     ExcessiveFailureRate,
@@ -18,8 +16,8 @@ from kovrin.safety.watchdog import (
     WatchdogAgent,
 )
 
-
 # ─── Helper ──────────────────────────────────────────────────
+
 
 def make_hashed(trace: Trace, seq: int = 0) -> HashedTrace:
     """Create a HashedTrace for testing (hash values don't matter here)."""
@@ -33,22 +31,29 @@ def make_hashed(trace: Trace, seq: int = 0) -> HashedTrace:
 
 # ─── NoExecutionAfterRejection ──────────────────────────────
 
+
 class TestNoExecutionAfterRejection:
     def test_triggers_on_exec_after_l0_rejection(self):
         rule = NoExecutionAfterRejection()
 
-        rejection = make_hashed(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="L0_CHECK",
-            l0_passed=False,
-        ), seq=0)
+        rejection = make_hashed(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="L0_CHECK",
+                l0_passed=False,
+            ),
+            seq=0,
+        )
 
-        exec_event = make_hashed(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="EXECUTION_START",
-        ), seq=1)
+        exec_event = make_hashed(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="EXECUTION_START",
+            ),
+            seq=1,
+        )
 
         alert = rule.check(exec_event, [rejection])
         assert alert is not None
@@ -58,18 +63,24 @@ class TestNoExecutionAfterRejection:
     def test_no_trigger_for_different_task(self):
         rule = NoExecutionAfterRejection()
 
-        rejection = make_hashed(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="L0_CHECK",
-            l0_passed=False,
-        ), seq=0)
+        rejection = make_hashed(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="L0_CHECK",
+                l0_passed=False,
+            ),
+            seq=0,
+        )
 
-        exec_event = make_hashed(Trace(
-            task_id="task-2",
-            intent_id="intent-1",
-            event_type="EXECUTION_START",
-        ), seq=1)
+        exec_event = make_hashed(
+            Trace(
+                task_id="task-2",
+                intent_id="intent-1",
+                event_type="EXECUTION_START",
+            ),
+            seq=1,
+        )
 
         alert = rule.check(exec_event, [rejection])
         assert alert is None
@@ -77,18 +88,24 @@ class TestNoExecutionAfterRejection:
     def test_no_trigger_for_passed_l0(self):
         rule = NoExecutionAfterRejection()
 
-        passed = make_hashed(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="L0_CHECK",
-            l0_passed=True,
-        ), seq=0)
+        passed = make_hashed(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="L0_CHECK",
+                l0_passed=True,
+            ),
+            seq=0,
+        )
 
-        exec_event = make_hashed(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="EXECUTION_START",
-        ), seq=1)
+        exec_event = make_hashed(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="EXECUTION_START",
+            ),
+            seq=1,
+        )
 
         alert = rule.check(exec_event, [passed])
         assert alert is None
@@ -96,21 +113,28 @@ class TestNoExecutionAfterRejection:
     def test_ignores_non_execution_events(self):
         rule = NoExecutionAfterRejection()
 
-        rejection = make_hashed(Trace(
-            task_id="task-1",
-            event_type="L0_CHECK",
-            l0_passed=False,
-        ), seq=0)
+        rejection = make_hashed(
+            Trace(
+                task_id="task-1",
+                event_type="L0_CHECK",
+                l0_passed=False,
+            ),
+            seq=0,
+        )
 
-        other = make_hashed(Trace(
-            task_id="task-1",
-            event_type="DECOMPOSITION",
-        ), seq=1)
+        other = make_hashed(
+            Trace(
+                task_id="task-1",
+                event_type="DECOMPOSITION",
+            ),
+            seq=1,
+        )
 
         assert rule.check(other, [rejection]) is None
 
 
 # ─── ExcessiveFailureRate ────────────────────────────────────
+
 
 class TestExcessiveFailureRate:
     def test_triggers_when_failure_rate_exceeds_threshold(self):
@@ -122,10 +146,13 @@ class TestExcessiveFailureRate:
             make_hashed(Trace(event_type="EXECUTION_COMPLETE"), seq=2),
         ]
 
-        trigger = make_hashed(Trace(
-            event_type="EXECUTION_COMPLETE",
-            intent_id="intent-1",
-        ), seq=3)
+        trigger = make_hashed(
+            Trace(
+                event_type="EXECUTION_COMPLETE",
+                intent_id="intent-1",
+            ),
+            seq=3,
+        )
 
         alert = rule.check(trigger, history)
         assert alert is not None
@@ -157,6 +184,7 @@ class TestExcessiveFailureRate:
 
 # ─── UnexpectedEventSequence ────────────────────────────────
 
+
 class TestUnexpectedEventSequence:
     def test_triggers_complete_without_start(self):
         rule = UnexpectedEventSequence()
@@ -165,11 +193,14 @@ class TestUnexpectedEventSequence:
             make_hashed(Trace(task_id="task-other", event_type="EXECUTION_START"), seq=0),
         ]
 
-        event = make_hashed(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="EXECUTION_COMPLETE",
-        ), seq=1)
+        event = make_hashed(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="EXECUTION_COMPLETE",
+            ),
+            seq=1,
+        )
 
         alert = rule.check(event, history)
         assert alert is not None
@@ -183,10 +214,13 @@ class TestUnexpectedEventSequence:
             make_hashed(Trace(task_id="task-1", event_type="EXECUTION_START"), seq=0),
         ]
 
-        event = make_hashed(Trace(
-            task_id="task-1",
-            event_type="EXECUTION_COMPLETE",
-        ), seq=1)
+        event = make_hashed(
+            Trace(
+                task_id="task-1",
+                event_type="EXECUTION_COMPLETE",
+            ),
+            seq=1,
+        )
 
         assert rule.check(event, history) is None
 
@@ -198,6 +232,7 @@ class TestUnexpectedEventSequence:
 
 
 # ─── WatchdogAgent ───────────────────────────────────────────
+
 
 class TestWatchdogAgent:
     def test_initial_state(self):
@@ -220,19 +255,23 @@ class TestWatchdogAgent:
         await wd.start(trace_log, "test")
 
         # L0 rejection
-        await trace_log.append_async(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="L0_CHECK",
-            l0_passed=False,
-        ))
+        await trace_log.append_async(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="L0_CHECK",
+                l0_passed=False,
+            )
+        )
 
         # Attempt execution of rejected task → should trigger KILL
-        await trace_log.append_async(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="EXECUTION_START",
-        ))
+        await trace_log.append_async(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="EXECUTION_START",
+            )
+        )
 
         assert wd.is_killed
         assert len(wd.alerts) >= 1
@@ -247,19 +286,23 @@ class TestWatchdogAgent:
 
         # Generate failures (L0 rejections via CRITIC_PIPELINE)
         for i in range(3):
-            await trace_log.append_async(Trace(
-                task_id=f"task-{i}",
-                intent_id="intent-1",
-                event_type="CRITIC_PIPELINE",
-                l0_passed=False,
-            ))
+            await trace_log.append_async(
+                Trace(
+                    task_id=f"task-{i}",
+                    intent_id="intent-1",
+                    event_type="CRITIC_PIPELINE",
+                    l0_passed=False,
+                )
+            )
 
         # One success
-        await trace_log.append_async(Trace(
-            task_id="task-ok",
-            intent_id="intent-1",
-            event_type="EXECUTION_COMPLETE",
-        ))
+        await trace_log.append_async(
+            Trace(
+                task_id="task-ok",
+                intent_id="intent-1",
+                event_type="EXECUTION_COMPLETE",
+            )
+        )
 
         assert wd.is_paused
         assert any(a.severity == ContainmentLevel.PAUSE for a in wd.alerts)
@@ -276,17 +319,21 @@ class TestWatchdogAgent:
         await wd.start(trace_log, "test")
 
         # Something to make history non-empty
-        await trace_log.append_async(Trace(
-            task_id="task-other",
-            event_type="DECOMPOSITION",
-        ))
+        await trace_log.append_async(
+            Trace(
+                task_id="task-other",
+                event_type="DECOMPOSITION",
+            )
+        )
 
         # Complete without start
-        await trace_log.append_async(Trace(
-            task_id="task-1",
-            intent_id="intent-1",
-            event_type="EXECUTION_COMPLETE",
-        ))
+        await trace_log.append_async(
+            Trace(
+                task_id="task-1",
+                intent_id="intent-1",
+                event_type="EXECUTION_COMPLETE",
+            )
+        )
 
         assert not wd.is_paused
         assert not wd.is_killed
@@ -340,16 +387,19 @@ class TestWatchdogAgent:
         wd._killed = True
 
         # No alerts should be generated
-        await trace_log.append_async(Trace(
-            task_id="task-1",
-            event_type="EXECUTION_COMPLETE",
-        ))
+        await trace_log.append_async(
+            Trace(
+                task_id="task-1",
+                event_type="EXECUTION_COMPLETE",
+            )
+        )
 
         assert len(wd.alerts) == 0
         await wd.stop()
 
 
 # ─── Trace Log Subscribe ─────────────────────────────────────
+
 
 class TestTraceLogSubscribe:
     async def test_subscribe_receives_events(self):
@@ -402,6 +452,7 @@ class TestTraceLogSubscribe:
 
 # ─── Default Rules ────────────────────────────────────────────
 
+
 class TestDefaultRules:
     def test_default_rules_exist(self):
         assert len(DEFAULT_RULES) == 6  # 3 original + 3 tool rules
@@ -417,6 +468,7 @@ class TestDefaultRules:
             ToolCallAfterBlock,
             ToolEscalationDetection,
         )
+
         assert ExcessiveToolCallRate in types
         assert ToolEscalationDetection in types
         assert ToolCallAfterBlock in types

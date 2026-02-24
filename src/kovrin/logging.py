@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -37,15 +37,23 @@ class KovrinFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         # Base log data
         log_data: dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
         }
 
         # Add extra fields (task_id, intent_id, risk_level, etc.)
-        for key in ("task_id", "intent_id", "risk_level", "event_type",
-                     "tool_name", "provider", "action", "duration_ms"):
+        for key in (
+            "task_id",
+            "intent_id",
+            "risk_level",
+            "event_type",
+            "tool_name",
+            "provider",
+            "action",
+            "duration_ms",
+        ):
             value = getattr(record, key, None)
             if value is not None:
                 log_data[key] = value
@@ -60,8 +68,11 @@ class KovrinFormatter(logging.Formatter):
 
         # Human-readable format
         extra_str = ""
-        extra_keys = {k: v for k, v in log_data.items()
-                      if k not in ("timestamp", "level", "logger", "message")}
+        extra_keys = {
+            k: v
+            for k, v in log_data.items()
+            if k not in ("timestamp", "level", "logger", "message")
+        }
         if extra_keys:
             extra_str = " | " + " ".join(f"{k}={v}" for k, v in extra_keys.items())
 

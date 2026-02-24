@@ -11,15 +11,13 @@ Verifies:
 """
 
 import asyncio
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
-from kovrin.core.models import ContainmentLevel, Trace, WatchdogAlert
+from kovrin.core.models import ContainmentLevel, Trace
 from kovrin.safety.watchdog import WatchdogAgent
-
 
 # ─── Helpers ────────────────────────────────────────────────
 
@@ -232,12 +230,14 @@ class TestDriftOnlyOnComplete:
         await watchdog.start(log, "Test intent")
 
         # EXECUTION_START should NOT trigger drift
-        await log.append_async(Trace(
-            intent_id="test",
-            task_id="task-1",
-            event_type="EXECUTION_START",
-            description="Starting task",
-        ))
+        await log.append_async(
+            Trace(
+                intent_id="test",
+                task_id="task-1",
+                event_type="EXECUTION_START",
+                description="Starting task",
+            )
+        )
         assert client.messages.create.call_count == 0
 
         await watchdog.stop()
@@ -256,11 +256,13 @@ class TestDriftOnlyOnComplete:
         log = ImmutableTraceLog()
         await watchdog.start(log, "Test intent")
 
-        await log.append_async(Trace(
-            intent_id="test",
-            event_type="DECOMPOSITION",
-            description="Decomposed",
-        ))
+        await log.append_async(
+            Trace(
+                intent_id="test",
+                event_type="DECOMPOSITION",
+                description="Decomposed",
+            )
+        )
         assert client.messages.create.call_count == 0
 
         await watchdog.stop()
@@ -279,13 +281,15 @@ class TestDriftOnlyOnComplete:
         log = ImmutableTraceLog()
         await watchdog.start(log, "Test intent")
 
-        await log.append_async(Trace(
-            intent_id="test",
-            task_id="task-1",
-            event_type="EXECUTION_COMPLETE",
-            description="Completed task",
-            details={"output_length": 100},
-        ))
+        await log.append_async(
+            Trace(
+                intent_id="test",
+                task_id="task-1",
+                event_type="EXECUTION_COMPLETE",
+                description="Completed task",
+                details={"output_length": 100},
+            )
+        )
         assert client.messages.create.call_count == 1
 
         await watchdog.stop()
@@ -306,13 +310,15 @@ class TestDriftDisabled:
         log = ImmutableTraceLog()
         await watchdog.start(log, "Test intent")
 
-        await log.append_async(Trace(
-            intent_id="test",
-            task_id="task-1",
-            event_type="EXECUTION_COMPLETE",
-            description="Completed",
-            details={"output_length": 100},
-        ))
+        await log.append_async(
+            Trace(
+                intent_id="test",
+                task_id="task-1",
+                event_type="EXECUTION_COMPLETE",
+                description="Completed",
+                details={"output_length": 100},
+            )
+        )
         assert client.messages.create.call_count == 0
         assert len(watchdog.alerts) == 0
 
@@ -330,12 +336,14 @@ class TestDriftDisabled:
         log = ImmutableTraceLog()
         await watchdog.start(log, "Test intent")
 
-        await log.append_async(Trace(
-            intent_id="test",
-            task_id="task-1",
-            event_type="EXECUTION_COMPLETE",
-            description="Completed",
-        ))
+        await log.append_async(
+            Trace(
+                intent_id="test",
+                task_id="task-1",
+                event_type="EXECUTION_COMPLETE",
+                description="Completed",
+            )
+        )
         assert len(watchdog.alerts) == 0
 
         await watchdog.stop()

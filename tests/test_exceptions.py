@@ -134,7 +134,9 @@ class TestHierarchy:
             PipelineError("id", "msg"),
         ]
         for err in errors:
-            assert isinstance(err, KovrinError), f"{type(err).__name__} should inherit from KovrinError"
+            assert isinstance(err, KovrinError), (
+                f"{type(err).__name__} should inherit from KovrinError"
+            )
             assert isinstance(err, Exception)
 
     def test_can_catch_all_with_kovrin_error(self):

@@ -17,7 +17,7 @@ Usage:
     provider = router.select(task_type="safety_critical")
 """
 
-from kovrin.providers.base import LLMProvider, LLMResponse, ContentBlock, ProviderConfig
+from kovrin.providers.base import ContentBlock, LLMProvider, LLMResponse, ProviderConfig
 from kovrin.providers.claude import ClaudeProvider
 from kovrin.providers.router import ModelRouter
 
@@ -55,13 +55,13 @@ def create_provider(
         return ClaudeProvider(config)
     elif name_lower == "openai":
         from kovrin.providers.openai import OpenAIProvider
+
         config = ProviderConfig(api_key=api_key, model=model or OpenAIProvider.DEFAULT_MODEL)
         return OpenAIProvider(config)
     elif name_lower == "ollama":
         from kovrin.providers.ollama import OllamaProvider
+
         config = ProviderConfig(model=model or OllamaProvider.DEFAULT_MODEL)
         return OllamaProvider(config)
     else:
-        raise ValueError(
-            f"Unknown provider: {name}. Supported: claude, openai, ollama"
-        )
+        raise ValueError(f"Unknown provider: {name}. Supported: claude, openai, ollama")

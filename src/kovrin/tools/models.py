@@ -9,7 +9,7 @@ pipeline, and logged to the Merkle audit trail.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -20,6 +20,7 @@ from kovrin.core.models import RiskLevel, RoutingAction, SpeculationTier
 
 class ToolCategory(str, Enum):
     """Classification of tool types for safety routing and DCT scope control."""
+
     READ_ONLY = "READ_ONLY"
     COMPUTATION = "COMPUTATION"
     NETWORK = "NETWORK"
@@ -34,6 +35,7 @@ class ToolRiskProfile(BaseModel):
     Determines how the SafeToolRouter classifies and routes
     calls to this tool through the safety pipeline.
     """
+
     risk_level: RiskLevel = RiskLevel.LOW
     speculation_tier: SpeculationTier = SpeculationTier.FREE
     category: ToolCategory = ToolCategory.READ_ONLY
@@ -48,6 +50,7 @@ class ToolCallRequest(BaseModel):
     Created when the LLM returns a tool_use response block.
     The SafeToolRouter evaluates this before execution.
     """
+
     id: str = Field(default_factory=lambda: f"tc-{uuid.uuid4().hex[:8]}")
     tool_name: str
     tool_input: dict[str, Any] = Field(default_factory=dict)
@@ -63,6 +66,7 @@ class ToolCallDecision(BaseModel):
     Produced by SafeToolRouter.evaluate(). If allowed=False,
     the tool call is blocked and the reason is fed back to Claude.
     """
+
     allowed: bool
     action: RoutingAction
     reason: str
@@ -78,8 +82,9 @@ class ToolCallTrace(BaseModel):
     Contains both the request and the safety decision so the
     complete tool call lifecycle is auditable.
     """
+
     id: str = Field(default_factory=lambda: f"tct-{uuid.uuid4().hex[:8]}")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     tool_name: str = ""
     tool_input: dict[str, Any] = Field(default_factory=dict)
     tool_output: str = ""

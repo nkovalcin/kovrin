@@ -3,11 +3,11 @@
 Tests both the stub behavior (no API key) and the formatting logic.
 """
 
-import json
 from unittest.mock import patch
 
 import pytest
 
+from kovrin.core.models import RiskLevel, SpeculationTier
 from kovrin.tools.builtin.web_search import (
     WEB_SEARCH_TOOL,
     _format_results,
@@ -15,7 +15,6 @@ from kovrin.tools.builtin.web_search import (
     _strip_html,
     _web_search,
 )
-from kovrin.core.models import RiskLevel, SpeculationTier
 
 
 class TestWebSearchToolConfig:
@@ -52,6 +51,7 @@ class TestWebSearchNoApiKey:
         with patch.dict("os.environ", {}, clear=True):
             # Also clear BRAVE_SEARCH_API_KEY specifically
             import os
+
             env = os.environ.copy()
             env.pop("BRAVE_SEARCH_API_KEY", None)
             with patch.dict("os.environ", env, clear=True):
@@ -62,6 +62,7 @@ class TestWebSearchNoApiKey:
     def test_get_api_key_returns_none(self):
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             env = os.environ.copy()
             env.pop("BRAVE_SEARCH_API_KEY", None)
             with patch.dict("os.environ", env, clear=True):

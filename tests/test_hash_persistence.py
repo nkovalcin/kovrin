@@ -1,15 +1,11 @@
 """Tests for LATTICE Phase 5 — Hash Chain Persistence and Autonomy Storage."""
 
-import pytest
-
 from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.models import (
     AutonomyProfile,
     AutonomySettings,
     ExecutionResult,
     RiskLevel,
-    SubTask,
-    TaskStatus,
     Trace,
 )
 from kovrin.storage.repository import PipelineRepository
@@ -47,7 +43,9 @@ class TestAutonomyPersistence:
 
 
 class TestHashChainPersistence:
-    def _make_result_with_traces(self, intent_id: str = "test-intent") -> tuple[ExecutionResult, list[dict]]:
+    def _make_result_with_traces(
+        self, intent_id: str = "test-intent"
+    ) -> tuple[ExecutionResult, list[dict]]:
         """Create a result with traces and matching hash data."""
         log = ImmutableTraceLog()
         traces = []
@@ -63,12 +61,14 @@ class TestHashChainPersistence:
             )
             hashed = log.append(trace)
             traces.append(trace)
-            hash_data.append({
-                "trace_id": trace.id,
-                "hash": hashed.hash,
-                "previous_hash": hashed.previous_hash,
-                "sequence": hashed.sequence,
-            })
+            hash_data.append(
+                {
+                    "trace_id": trace.id,
+                    "hash": hashed.hash,
+                    "previous_hash": hashed.previous_hash,
+                    "sequence": hashed.sequence,
+                }
+            )
 
         result = ExecutionResult(
             intent_id=intent_id,
@@ -129,8 +129,7 @@ class TestHashChainPersistence:
 
         # Verify chain
         for i in range(1, len(rows)):
-            assert rows[i]["previous_hash"] == rows[i - 1]["hash"], \
-                f"Chain broken at frame {i}"
+            assert rows[i]["previous_hash"] == rows[i - 1]["hash"], f"Chain broken at frame {i}"
         repo.close()
 
     def test_get_traces_with_hashes_returns_all_fields(self):

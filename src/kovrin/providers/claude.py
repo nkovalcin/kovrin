@@ -93,12 +93,14 @@ class ClaudeProvider(LLMProvider):
             if block.type == "text":
                 blocks.append(ContentBlock(type="text", text=block.text))
             elif block.type == "tool_use":
-                blocks.append(ContentBlock(
-                    type="tool_use",
-                    tool_name=block.name,
-                    tool_input=block.input,
-                    tool_use_id=block.id,
-                ))
+                blocks.append(
+                    ContentBlock(
+                        type="tool_use",
+                        tool_name=block.name,
+                        tool_input=block.input,
+                        tool_use_id=block.id,
+                    )
+                )
 
         return LLMResponse(
             content=blocks,
@@ -109,7 +111,9 @@ class ClaudeProvider(LLMProvider):
         )
 
     @classmethod
-    def from_client(cls, client: anthropic.AsyncAnthropic, model: str | None = None) -> ClaudeProvider:
+    def from_client(
+        cls, client: anthropic.AsyncAnthropic, model: str | None = None
+    ) -> ClaudeProvider:
         """Create a ClaudeProvider from an existing Anthropic client.
 
         Useful for backward-compatible wiring where the client already exists.

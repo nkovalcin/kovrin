@@ -1,6 +1,5 @@
 """Tests for SuperWork SQLite repository."""
 
-
 import pytest
 
 from kovrin.core.models import RiskLevel

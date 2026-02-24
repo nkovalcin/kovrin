@@ -65,6 +65,7 @@ async def _web_search(query: str, max_results: int = 5) -> str:
                 # Handle gzip encoding
                 if resp.headers.get("Content-Encoding") == "gzip":
                     import gzip
+
                     raw = gzip.decompress(raw)
                 data = json.loads(raw.decode("utf-8"))
         except HTTPError as e:
@@ -135,6 +136,7 @@ def _format_results(data: dict, query: str) -> str:
 def _strip_html(text: str) -> str:
     """Remove HTML tags from text."""
     import re
+
     clean = re.sub(r"<[^>]+>", "", text)
     return clean.strip()
 

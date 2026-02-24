@@ -1,0 +1,156 @@
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+export type TaskStatus = 'PENDING' | 'READY' | 'EXECUTING' | 'COMPLETED' | 'FAILED' | 'REJECTED_BY_L0' | 'AWAITING_HUMAN' | 'SKIPPED'
+export type ContainmentLevel = 'WARN' | 'PAUSE' | 'KILL'
+
+export interface Trace {
+  id: string
+  timestamp: string
+  intent_id: string
+  task_id: string
+  event_type: string
+  description: string
+  details: Record<string, unknown>
+  risk_level: RiskLevel | null
+  l0_passed: boolean | null
+}
+
+export interface SubTask {
+  id: string
+  description: string
+  risk_level: RiskLevel
+  status: TaskStatus
+  speculation_tier: string
+  output: string | null
+  dependencies: string[]
+}
+
+export interface WatchdogAlert {
+  id: string
+  timestamp: string
+  severity: ContainmentLevel
+  reason: string
+  task_id: string
+  intent_id: string
+  rule: string
+}
+
+export interface ExecutionResult {
+  intent_id: string
+  output: string
+  success: boolean
+  sub_tasks: SubTask[]
+  traces: Trace[]
+  graph_summary: Record<string, unknown>
+  rejected_tasks: SubTask[]
+}
+
+export interface PipelineStatus {
+  running_pipelines: number
+  completed_pipelines: number
+  version: string
+}
+
+export type ViewMode = 'OPERATOR' | 'ANALYST' | 'DEVELOPER'
+export type AutonomyProfile = 'DEFAULT' | 'CAUTIOUS' | 'AGGRESSIVE' | 'LOCKED'
+export type RoutingAction = 'AUTO_EXECUTE' | 'SANDBOX_REVIEW' | 'HUMAN_APPROVAL'
+
+export interface AutonomySettings {
+  profile: AutonomyProfile
+  override_matrix: Record<string, string>
+  updated_at: string
+}
+
+export interface ReplayFrame {
+  sequence: number
+  trace_id: string
+  hash: string
+  previous_hash: string
+  event_type: string
+  description: string
+  risk_level: RiskLevel | null
+  l0_passed: boolean | null
+  details: Record<string, unknown>
+  task_id: string
+  timestamp: string
+  counterfactual_action: RoutingAction | null
+}
+
+export interface ReplaySession {
+  intent_id: string
+  total_frames: number
+  frames: ReplayFrame[]
+  chain_valid: boolean
+  chain_message: string
+}
+
+export interface CounterfactualResult {
+  task_id: string
+  task_description: string
+  actual_action: RoutingAction
+  counterfactual_action: RoutingAction
+  changed: boolean
+  risk_level: RiskLevel
+  speculation_tier: string
+}
+
+// ─── Phase 6: Advanced Alignment & Scaling ─────────────────
+
+export type TopologyType = 'SEQUENTIAL' | 'PARALLEL' | 'PIPELINE' | 'MAP_REDUCE' | 'HIERARCHICAL'
+export type DriftLevel = 'NONE' | 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL'
+
+export interface PrmStepScore {
+  step_index: number
+  description: string
+  score: number
+  reasoning: string
+}
+
+export interface PrmScore {
+  task_id: string
+  aggregate_score: number
+  step_count: number
+  step_scores: number[]
+  reasoning: string
+  timestamp: string
+}
+
+export interface AgentDriftMetrics {
+  agent_name: string
+  total_executions: number
+  average_prm_score: number
+  success_rate: number
+  drift_level: DriftLevel
+  recent_prm_scores: number[]
+}
+
+export interface DelegationScope {
+  allowed_risk_levels: RiskLevel[]
+  allowed_actions: RoutingAction[]
+  max_tasks: number
+  max_depth: number
+}
+
+export interface DelegationToken {
+  id: string
+  agent_id: string
+  scope: DelegationScope
+  issued_at: string
+  expires_at: string
+  parent_token_id: string | null
+  tasks_executed: number
+  revoked: boolean
+}
+
+export interface TopologyRecommendation {
+  topology: TopologyType
+  confidence: number
+  reasoning: string
+  metrics: Record<string, unknown>
+}
+
+export interface WsMessage {
+  type: 'trace' | 'alert' | 'pipeline_complete' | 'pong' | 'approval_request' | 'autonomy_updated'
+  data?: Trace | AutonomySettings | unknown
+  intent_id?: string
+  success?: boolean
+}

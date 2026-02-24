@@ -44,9 +44,9 @@ from kovrin.core.models import (
     ExecutionResult,
     ExplorationResult,
     MCTSNode,
-    ProofObligation,
     PrmScore,
     PrmStepScore,
+    ProofObligation,
     ReplayFrame,
     ReplaySession,
     RiskLevel,
@@ -308,6 +308,7 @@ class SchemaExporter:
 
 # ─── CLI ───
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="kovrin.schema.exporter",
@@ -327,7 +328,7 @@ def main() -> None:
         for m in exporter.MODELS:
             fields = list(m.model_json_schema(mode="serialization").get("properties", {}).keys())
             print(f"  {m.__name__:30s} ({len(fields)} fields)")
-        print(f"\nEnums:")
+        print("\nEnums:")
         for e in exporter.ENUMS:
             print(f"  {e.__name__:30s} ({len(e)} members)")
         print(f"\nTotal: {len(exporter.MODELS)} models, {len(exporter.ENUMS)} enums")

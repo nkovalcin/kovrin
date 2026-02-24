@@ -10,12 +10,11 @@ Scoring is based on:
 """
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from kovrin.core.models import (
     BeamState,
     DecompositionCandidate,
-    SubTask,
 )
 from kovrin.engine.graph import ExecutionGraph, GraphNode, NodeState
 
@@ -23,6 +22,7 @@ from kovrin.engine.graph import ExecutionGraph, GraphNode, NodeState
 @dataclass
 class Beam:
     """A single execution beam with its own graph and state."""
+
     id: str
     decomposition: DecompositionCandidate
     graph: ExecutionGraph
@@ -136,8 +136,7 @@ class BeamSearchExecutor:
                     dep_results = {
                         dep_id: beam.graph.nodes[dep_id].result
                         for dep_id in node.dependencies
-                        if dep_id in beam.graph.nodes
-                        and beam.graph.nodes[dep_id].result
+                        if dep_id in beam.graph.nodes and beam.graph.nodes[dep_id].result
                     }
                     node.state = NodeState.RUNNING
                     result = await execute_fn(node.task, dep_results)
@@ -169,11 +168,7 @@ class BeamSearchExecutor:
         if total == 0:
             return 0.0
 
-        completed = sum(
-            1
-            for n in beam.graph.nodes.values()
-            if n.state == NodeState.COMPLETED
-        )
+        completed = sum(1 for n in beam.graph.nodes.values() if n.state == NodeState.COMPLETED)
 
         success_rate = completed / total
         base_score = beam.decomposition.critic_pass_rate
@@ -194,9 +189,7 @@ class BeamSearchExecutor:
             active[i].state.active = False
             self._beams_pruned += 1
 
-    def _build_graph(
-        self, candidate: DecompositionCandidate, intent_id: str
-    ) -> ExecutionGraph:
+    def _build_graph(self, candidate: DecompositionCandidate, intent_id: str) -> ExecutionGraph:
         """Build an ExecutionGraph from a DecompositionCandidate."""
         graph = ExecutionGraph(intent_id=intent_id)
         task_ids = {t.id for t in candidate.subtasks}

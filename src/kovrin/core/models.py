@@ -7,16 +7,17 @@ dependencies beyond pydantic.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
-
 # ─── Enums ───────────────────────────────────────────────────
+
 
 class RiskLevel(str, Enum):
     """Risk classification for sub-tasks."""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -25,6 +26,7 @@ class RiskLevel(str, Enum):
 
 class TaskStatus(str, Enum):
     """Lifecycle state of a sub-task."""
+
     PENDING = "PENDING"
     READY = "READY"
     EXECUTING = "EXECUTING"
@@ -43,6 +45,7 @@ class SpeculationTier(str, Enum):
     - GUARDED: Reversible -> sandbox with commit/rollback
     - NONE: Irreversible -> human confirmation required
     """
+
     FREE = "FREE"
     GUARDED = "GUARDED"
     NONE = "NONE"
@@ -50,6 +53,7 @@ class SpeculationTier(str, Enum):
 
 class RoutingAction(str, Enum):
     """Decision from the risk router."""
+
     AUTO_EXECUTE = "AUTO_EXECUTE"
     SANDBOX_REVIEW = "SANDBOX_REVIEW"
     HUMAN_APPROVAL = "HUMAN_APPROVAL"
@@ -57,6 +61,7 @@ class RoutingAction(str, Enum):
 
 class ContainmentLevel(str, Enum):
     """Watchdog graduated containment response."""
+
     WARN = "WARN"
     PAUSE = "PAUSE"
     KILL = "KILL"
@@ -64,6 +69,7 @@ class ContainmentLevel(str, Enum):
 
 class AgentRole(str, Enum):
     """Specialized agent roles for multi-agent coordination."""
+
     RESEARCHER = "RESEARCHER"
     WRITER = "WRITER"
     REVIEWER = "REVIEWER"
@@ -73,6 +79,7 @@ class AgentRole(str, Enum):
 
 class ToolCategory(str, Enum):
     """Classification of tool types for safety routing and DCT scope control."""
+
     READ_ONLY = "READ_ONLY"
     COMPUTATION = "COMPUTATION"
     NETWORK = "NETWORK"
@@ -83,8 +90,10 @@ class ToolCategory(str, Enum):
 
 # ─── Proof Obligations ──────────────────────────────────────
 
+
 class ProofObligation(BaseModel):
     """Result of checking a sub-task against a single Layer 0 axiom."""
+
     axiom_id: int
     axiom_name: str
     description: str
@@ -94,8 +103,10 @@ class ProofObligation(BaseModel):
 
 # ─── Sub-Task ────────────────────────────────────────────────
 
+
 class SubTask(BaseModel):
     """A decomposed unit of work derived from an intent."""
+
     id: str = Field(default_factory=lambda: f"task-{uuid.uuid4().hex[:8]}")
     description: str
     risk_level: RiskLevel = RiskLevel.LOW
@@ -110,10 +121,12 @@ class SubTask(BaseModel):
 
 # ─── Trace Event ─────────────────────────────────────────────
 
+
 class Trace(BaseModel):
     """An immutable audit event in the execution pipeline."""
+
     id: str = Field(default_factory=lambda: f"tr-{uuid.uuid4().hex[:8]}")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     intent_id: str = ""
     task_id: str = ""
     event_type: str = ""
@@ -125,8 +138,10 @@ class Trace(BaseModel):
 
 # ─── Routing Decision ───────────────────────────────────────
 
+
 class RoutingDecision(BaseModel):
     """Output of the risk router for a single sub-task."""
+
     task_id: str
     action: RoutingAction
     risk_level: RiskLevel
@@ -136,8 +151,10 @@ class RoutingDecision(BaseModel):
 
 # ─── Execution Result ───────────────────────────────────────
 
+
 class ExecutionResult(BaseModel):
     """Final output of a Kovrin pipeline run."""
+
     intent_id: str
     output: str = ""
     success: bool = True
@@ -150,10 +167,12 @@ class ExecutionResult(BaseModel):
 
 # ─── Watchdog ────────────────────────────────────────────────
 
+
 class WatchdogAlert(BaseModel):
     """An alert raised by the watchdog agent."""
+
     id: str = Field(default_factory=lambda: f"alert-{uuid.uuid4().hex[:8]}")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     severity: ContainmentLevel
     reason: str
     task_id: str = ""
@@ -163,8 +182,10 @@ class WatchdogAlert(BaseModel):
 
 # ─── Approval ───────────────────────────────────────────────
 
+
 class ApprovalStatus(str, Enum):
     """Status of a human approval request."""
+
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
@@ -173,6 +194,7 @@ class ApprovalStatus(str, Enum):
 
 class ApprovalRequest(BaseModel):
     """A request for human approval of a high-risk task."""
+
     intent_id: str
     task_id: str
     description: str
@@ -181,13 +203,15 @@ class ApprovalRequest(BaseModel):
     proof_obligations: list[ProofObligation] = Field(default_factory=list)
     reason: str = ""
     status: ApprovalStatus = ApprovalStatus.PENDING
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ─── Agent Info ──────────────────────────────────────────────
 
+
 class AgentInfo(BaseModel):
     """Metadata about a specialized agent."""
+
     name: str
     role: AgentRole
     capabilities: list[str] = Field(default_factory=list)
@@ -198,6 +222,7 @@ class AgentInfo(BaseModel):
 
 class DecompositionCandidate(BaseModel):
     """A candidate decomposition generated during MCTS exploration."""
+
     id: str = Field(default_factory=lambda: f"dec-{uuid.uuid4().hex[:8]}")
     subtasks: list[SubTask] = Field(default_factory=list)
     score: float = 0.0
@@ -210,6 +235,7 @@ class DecompositionCandidate(BaseModel):
 
 class MCTSNode(BaseModel):
     """A node in the MCTS search tree over decompositions."""
+
     id: str = Field(default_factory=lambda: f"mcts-{uuid.uuid4().hex[:8]}")
     candidate: DecompositionCandidate = Field(default_factory=DecompositionCandidate)
     children: list[str] = Field(default_factory=list)
@@ -221,6 +247,7 @@ class MCTSNode(BaseModel):
 
 class BeamState(BaseModel):
     """State of a single beam during beam search execution."""
+
     id: str = Field(default_factory=lambda: f"beam-{uuid.uuid4().hex[:8]}")
     decomposition_id: str = ""
     completed_tasks: dict[str, str] = Field(default_factory=dict)
@@ -231,6 +258,7 @@ class BeamState(BaseModel):
 
 class ConfidenceEstimate(BaseModel):
     """Claude-based confidence estimate for a task output."""
+
     task_id: str
     confidence: float = Field(0.5, ge=0.0, le=1.0)
     reasoning: str = ""
@@ -239,6 +267,7 @@ class ConfidenceEstimate(BaseModel):
 
 class ExplorationResult(BaseModel):
     """Summary of the exploration process (MCTS + beam search)."""
+
     candidates_explored: int = 0
     best_decomposition_id: str = ""
     mcts_iterations: int = 0
@@ -253,6 +282,7 @@ class ExplorationResult(BaseModel):
 
 class ViewMode(str, Enum):
     """Three-tier progressive disclosure for the dashboard."""
+
     OPERATOR = "OPERATOR"
     ANALYST = "ANALYST"
     DEVELOPER = "DEVELOPER"
@@ -260,6 +290,7 @@ class ViewMode(str, Enum):
 
 class AutonomyProfile(str, Enum):
     """Named autonomy presets for risk routing overrides."""
+
     DEFAULT = "DEFAULT"
     CAUTIOUS = "CAUTIOUS"
     AGGRESSIVE = "AGGRESSIVE"
@@ -272,13 +303,15 @@ class AutonomySettings(BaseModel):
     Applied after the default routing matrix. Cell overrides take
     precedence over profile overrides.
     """
+
     profile: AutonomyProfile = AutonomyProfile.DEFAULT
     override_matrix: dict[str, str] = Field(default_factory=dict)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ReplayFrame(BaseModel):
     """A single step in a decision replay session."""
+
     sequence: int = 0
     trace_id: str = ""
     hash: str = ""
@@ -295,6 +328,7 @@ class ReplayFrame(BaseModel):
 
 class ReplaySession(BaseModel):
     """A loaded replay for a completed pipeline."""
+
     intent_id: str
     total_frames: int = 0
     frames: list[ReplayFrame] = Field(default_factory=list)
@@ -304,12 +338,14 @@ class ReplaySession(BaseModel):
 
 class CounterfactualRequest(BaseModel):
     """What-if request: re-evaluate routing with alternate autonomy settings."""
+
     intent_id: str
     autonomy_settings: AutonomySettings
 
 
 class CounterfactualResult(BaseModel):
     """Per-task routing diff between actual and hypothetical."""
+
     task_id: str
     task_description: str = ""
     actual_action: RoutingAction
@@ -324,6 +360,7 @@ class CounterfactualResult(BaseModel):
 
 class TopologyType(str, Enum):
     """Execution topology for a task graph."""
+
     SEQUENTIAL = "SEQUENTIAL"
     PARALLEL = "PARALLEL"
     PIPELINE = "PIPELINE"
@@ -333,6 +370,7 @@ class TopologyType(str, Enum):
 
 class PrmStepScore(BaseModel):
     """Score for a single reasoning step within a task output."""
+
     step_index: int
     description: str = ""
     score: float = Field(0.5, ge=0.0, le=1.0)
@@ -341,15 +379,17 @@ class PrmStepScore(BaseModel):
 
 class PrmScore(BaseModel):
     """Process Reward Model score for a complete task."""
+
     task_id: str
     step_scores: list[PrmStepScore] = Field(default_factory=list)
     aggregate_score: float = Field(0.5, ge=0.0, le=1.0)
     reasoning: str = ""
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class DriftLevel(str, Enum):
     """Severity of agent behavioral drift."""
+
     NONE = "NONE"
     LOW = "LOW"
     MODERATE = "MODERATE"
@@ -359,19 +399,23 @@ class DriftLevel(str, Enum):
 
 class AgentDriftMetrics(BaseModel):
     """Per-agent performance tracking for drift detection."""
+
     agent_name: str
     total_executions: int = 0
     recent_prm_scores: list[float] = Field(default_factory=list)
     average_prm_score: float = 0.0
     success_rate: float = 1.0
     drift_level: DriftLevel = DriftLevel.NONE
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class DelegationScope(BaseModel):
     """Defines the minimum-privilege boundary for a delegation token."""
+
     allowed_risk_levels: list[RiskLevel] = Field(default_factory=lambda: [RiskLevel.LOW])
-    allowed_actions: list[RoutingAction] = Field(default_factory=lambda: [RoutingAction.AUTO_EXECUTE])
+    allowed_actions: list[RoutingAction] = Field(
+        default_factory=lambda: [RoutingAction.AUTO_EXECUTE]
+    )
     allowed_capabilities: list[str] = Field(default_factory=list)
     allowed_tool_categories: list[ToolCategory] = Field(default_factory=list)
     max_tasks: int = 10
@@ -381,11 +425,12 @@ class DelegationScope(BaseModel):
 
 class DelegationToken(BaseModel):
     """Cryptographically signed capability token for agent delegation."""
+
     id: str = Field(default_factory=lambda: f"dct-{uuid.uuid4().hex[:12]}")
     agent_id: str
     scope: DelegationScope = Field(default_factory=DelegationScope)
-    issued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     parent_token_id: str | None = None
     signature: str = ""
     revoked: bool = False
@@ -394,6 +439,7 @@ class DelegationToken(BaseModel):
 
 class TopologyRecommendation(BaseModel):
     """Result of automatic topology analysis."""
+
     topology: TopologyType = TopologyType.SEQUENTIAL
     confidence: float = Field(0.5, ge=0.0, le=1.0)
     reasoning: str = ""

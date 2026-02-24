@@ -13,11 +13,13 @@ from kovrin.tools.registry import RegisteredTool
 from kovrin.tools.sandbox import SandboxConfig, SandboxedExecutor
 
 # Shared sandbox executor for code execution
-_sandbox = SandboxedExecutor(SandboxConfig(
-    timeout_seconds=30.0,
-    max_output_bytes=65536,
-    network_allowed=False,
-))
+_sandbox = SandboxedExecutor(
+    SandboxConfig(
+        timeout_seconds=30.0,
+        max_output_bytes=65536,
+        network_allowed=False,
+    )
+)
 
 
 async def _execute_code(code: str) -> str:

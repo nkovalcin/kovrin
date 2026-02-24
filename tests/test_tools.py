@@ -11,25 +11,20 @@ Verifies:
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from kovrin.agents.base import Agent
 from kovrin.agents.tools import (
-    CALCULATOR_TOOL,
-    CURRENT_DATETIME_TOOL,
-    JSON_FORMATTER_TOOL,
     ToolDefinition,
     ToolExecutor,
-    ToolResult,
-    create_default_tools,
     _calculator,
     _current_datetime,
     _json_formatter,
+    create_default_tools,
 )
-from kovrin.agents.base import Agent
 from kovrin.core.models import AgentRole, SubTask
-
 
 # ─── Built-in Tools ────────────────────────────────────────
 

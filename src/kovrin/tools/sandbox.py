@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -21,6 +20,7 @@ from pydantic import BaseModel, Field
 
 class SandboxConfig(BaseModel):
     """Configuration for sandboxed tool execution."""
+
     timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
     max_output_bytes: int = Field(default=65536, ge=1024, le=1048576)
     network_allowed: bool = False
@@ -75,7 +75,8 @@ class SandboxedExecutor:
             cwd = cfg.filesystem_root if cfg.filesystem_root else tempfile.gettempdir()
 
             proc = await asyncio.create_subprocess_exec(
-                "python3", tmp_path,
+                "python3",
+                tmp_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
@@ -87,7 +88,7 @@ class SandboxedExecutor:
                     proc.communicate(),
                     timeout=cfg.timeout_seconds,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 await proc.wait()
                 return f"[TIMEOUT] Code execution exceeded {cfg.timeout_seconds}s limit"
@@ -95,12 +96,15 @@ class SandboxedExecutor:
             # Enforce output size limit
             output = stdout.decode("utf-8", errors="replace")
             if len(output) > cfg.max_output_bytes:
-                output = output[:cfg.max_output_bytes] + f"\n[TRUNCATED at {cfg.max_output_bytes} bytes]"
+                output = (
+                    output[: cfg.max_output_bytes]
+                    + f"\n[TRUNCATED at {cfg.max_output_bytes} bytes]"
+                )
 
             if proc.returncode != 0:
                 error = stderr.decode("utf-8", errors="replace")
                 if len(error) > cfg.max_output_bytes:
-                    error = error[:cfg.max_output_bytes]
+                    error = error[: cfg.max_output_bytes]
                 return f"[ERROR exit={proc.returncode}]\n{error}"
 
             return output
@@ -149,6 +153,7 @@ class SandboxedExecutor:
             return True, "No domain restrictions — all domains allowed"
 
         from urllib.parse import urlparse
+
         try:
             parsed = urlparse(url)
             domain = parsed.hostname or ""

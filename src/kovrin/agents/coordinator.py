@@ -17,7 +17,7 @@ import anthropic
 
 from kovrin.agents.base import Agent
 from kovrin.agents.registry import AgentRegistry
-from kovrin.core.models import AgentRole, DelegationScope, RiskLevel, SubTask, Trace
+from kovrin.core.models import AgentRole, DelegationScope, SubTask, Trace
 
 if TYPE_CHECKING:
     from kovrin.engine.tokens import DelegationToken, TokenAuthority
@@ -25,10 +25,48 @@ if TYPE_CHECKING:
 
 # Keyword-to-role mapping for automatic role inference
 _ROLE_KEYWORDS: dict[AgentRole, list[str]] = {
-    AgentRole.RESEARCHER: ["analyze", "research", "investigate", "compare", "evaluate", "assess", "audit", "review data", "identify patterns"],
-    AgentRole.WRITER: ["write", "generate", "create", "draft", "compose", "summarize", "document", "report", "recommend"],
-    AgentRole.REVIEWER: ["review", "validate", "check", "verify", "quality", "inspect", "test", "ensure"],
-    AgentRole.PLANNER: ["plan", "schedule", "roadmap", "strategy", "organize", "prioritize", "decompose", "coordinate"],
+    AgentRole.RESEARCHER: [
+        "analyze",
+        "research",
+        "investigate",
+        "compare",
+        "evaluate",
+        "assess",
+        "audit",
+        "review data",
+        "identify patterns",
+    ],
+    AgentRole.WRITER: [
+        "write",
+        "generate",
+        "create",
+        "draft",
+        "compose",
+        "summarize",
+        "document",
+        "report",
+        "recommend",
+    ],
+    AgentRole.REVIEWER: [
+        "review",
+        "validate",
+        "check",
+        "verify",
+        "quality",
+        "inspect",
+        "test",
+        "ensure",
+    ],
+    AgentRole.PLANNER: [
+        "plan",
+        "schedule",
+        "roadmap",
+        "strategy",
+        "organize",
+        "prioritize",
+        "decompose",
+        "coordinate",
+    ],
 }
 
 
@@ -137,10 +175,12 @@ class AgentCoordinator:
             response = await self._client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=4096,
-                messages=[{
-                    "role": "user",
-                    "content": f"Execute this task:\n{subtask.description}",
-                }],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Execute this task:\n{subtask.description}",
+                    }
+                ],
             )
             return response.content[0].text
 

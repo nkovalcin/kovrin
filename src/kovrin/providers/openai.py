@@ -43,8 +43,7 @@ class OpenAIProvider(LLMProvider):
             from openai import AsyncOpenAI
         except ImportError as e:
             raise ImportError(
-                "OpenAI provider requires the 'openai' package. "
-                "Install with: pip install openai"
+                "OpenAI provider requires the 'openai' package. Install with: pip install openai"
             ) from e
 
         kwargs: dict[str, Any] = {}
@@ -106,7 +105,9 @@ class OpenAIProvider(LLMProvider):
         # Handle tool_result messages
         if msg.get("role") == "user" and isinstance(content, list):
             # Check if this is a tool_result list
-            tool_results = [c for c in content if isinstance(c, dict) and c.get("type") == "tool_result"]
+            tool_results = [
+                c for c in content if isinstance(c, dict) and c.get("type") == "tool_result"
+            ]
             if tool_results:
                 # OpenAI expects tool messages separately
                 # Return the first one (multi-tool results need special handling)
@@ -127,14 +128,17 @@ class OpenAIProvider(LLMProvider):
                         text_parts.append(block.text)
                     elif block.type == "tool_use":
                         import json
-                        tool_calls.append({
-                            "id": block.id,
-                            "type": "function",
-                            "function": {
-                                "name": block.name,
-                                "arguments": json.dumps(block.input),
-                            },
-                        })
+
+                        tool_calls.append(
+                            {
+                                "id": block.id,
+                                "type": "function",
+                                "function": {
+                                    "name": block.name,
+                                    "arguments": json.dumps(block.input),
+                                },
+                            }
+                        )
 
             result: dict[str, Any] = {
                 "role": "assistant",
@@ -151,14 +155,16 @@ class OpenAIProvider(LLMProvider):
         """Convert Anthropic tool schema to OpenAI function calling format."""
         oai_tools = []
         for tool in tools:
-            oai_tools.append({
-                "type": "function",
-                "function": {
-                    "name": tool["name"],
-                    "description": tool.get("description", ""),
-                    "parameters": tool.get("input_schema", {}),
-                },
-            })
+            oai_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool["name"],
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("input_schema", {}),
+                    },
+                }
+            )
         return oai_tools
 
     @staticmethod
@@ -178,13 +184,16 @@ class OpenAIProvider(LLMProvider):
         # Tool calls
         if msg.tool_calls:
             import json
+
             for tc in msg.tool_calls:
-                blocks.append(ContentBlock(
-                    type="tool_use",
-                    tool_name=tc.function.name,
-                    tool_input=json.loads(tc.function.arguments),
-                    tool_use_id=tc.id,
-                ))
+                blocks.append(
+                    ContentBlock(
+                        type="tool_use",
+                        tool_name=tc.function.name,
+                        tool_input=json.loads(tc.function.arguments),
+                        tool_use_id=tc.id,
+                    )
+                )
 
         # Map finish_reason to Anthropic-style stop_reason
         stop_reason_map = {

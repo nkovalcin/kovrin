@@ -1,15 +1,15 @@
 """Tests for LATTICE Phase 6 — Process Reward Model."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from kovrin.core.models import PrmScore, PrmStepScore, RiskLevel, SubTask, Trace
+from kovrin.core.models import PrmScore, PrmStepScore, RiskLevel, SubTask
 from kovrin.engine.prm import ProcessRewardModel
 
-
 # ─── Model Tests ──────────────────────────────────────────
+
 
 class TestPrmModels:
     def test_prm_step_score_defaults(self):
@@ -39,6 +39,7 @@ class TestPrmModels:
 
 
 # ─── Weighted Aggregate Tests ─────────────────────────────
+
 
 class TestWeightedAggregate:
     def test_empty_steps(self):
@@ -76,6 +77,7 @@ class TestWeightedAggregate:
 
 # ─── Threshold Tests ──────────────────────────────────────
 
+
 class TestThreshold:
     def test_below_threshold(self):
         prm = ProcessRewardModel(AsyncMock(), threshold=0.6)
@@ -101,16 +103,19 @@ class TestThreshold:
 
 # ─── Parse Response Tests ─────────────────────────────────
 
+
 class TestParseResponse:
     def test_valid_json(self):
         prm = ProcessRewardModel(AsyncMock())
-        raw = json.dumps({
-            "steps": [
-                {"step_index": 0, "description": "Step A", "score": 0.9, "reasoning": "Good"},
-                {"step_index": 1, "description": "Step B", "score": 0.5, "reasoning": "OK"},
-            ],
-            "overall_reasoning": "Mixed quality",
-        })
+        raw = json.dumps(
+            {
+                "steps": [
+                    {"step_index": 0, "description": "Step A", "score": 0.9, "reasoning": "Good"},
+                    {"step_index": 1, "description": "Step B", "score": 0.5, "reasoning": "OK"},
+                ],
+                "overall_reasoning": "Mixed quality",
+            }
+        )
         result = prm._parse_response(raw, "t1")
         assert len(result.step_scores) == 2
         assert result.step_scores[0].score == 0.9
@@ -126,12 +131,14 @@ class TestParseResponse:
 
     def test_score_clamped_to_range(self):
         prm = ProcessRewardModel(AsyncMock())
-        raw = json.dumps({
-            "steps": [
-                {"step_index": 0, "score": 1.5},
-                {"step_index": 1, "score": -0.5},
-            ],
-        })
+        raw = json.dumps(
+            {
+                "steps": [
+                    {"step_index": 0, "score": 1.5},
+                    {"step_index": 1, "score": -0.5},
+                ],
+            }
+        )
         result = prm._parse_response(raw, "t1")
         assert result.step_scores[0].score == 1.0
         assert result.step_scores[1].score == 0.0
@@ -144,6 +151,7 @@ class TestParseResponse:
 
 
 # ─── Trace Creation Tests ─────────────────────────────────
+
 
 class TestPrmTrace:
     def test_create_trace(self):
@@ -164,17 +172,29 @@ class TestPrmTrace:
 
 # ─── Evaluate Integration Tests ───────────────────────────
 
+
 class TestPrmEvaluate:
     @pytest.mark.asyncio
     async def test_evaluate_success(self):
         mock_client = AsyncMock()
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text=json.dumps({
-            "steps": [
-                {"step_index": 0, "description": "Analysis", "score": 0.85, "reasoning": "Thorough"},
-            ],
-            "overall_reasoning": "High quality",
-        }))]
+        mock_response.content = [
+            MagicMock(
+                text=json.dumps(
+                    {
+                        "steps": [
+                            {
+                                "step_index": 0,
+                                "description": "Analysis",
+                                "score": 0.85,
+                                "reasoning": "Thorough",
+                            },
+                        ],
+                        "overall_reasoning": "High quality",
+                    }
+                )
+            )
+        ]
         mock_client.messages.create = AsyncMock(return_value=mock_response)
 
         prm = ProcessRewardModel(mock_client)

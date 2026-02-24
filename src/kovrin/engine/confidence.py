@@ -97,10 +97,7 @@ Return ONLY JSON."""
         if len(self._history) < 10:
             return raw
 
-        nearby = [
-            actual for est, actual in self._history
-            if abs(est - raw) < 0.15
-        ]
+        nearby = [actual for est, actual in self._history if abs(est - raw) < 0.15]
         if not nearby:
             return raw
 

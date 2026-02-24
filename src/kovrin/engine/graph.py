@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from kovrin.core.models import RiskLevel, SubTask, TaskStatus, Trace
+from kovrin.core.models import SubTask, TaskStatus, Trace
 
 
 class NodeState(str, Enum):
@@ -44,10 +44,11 @@ class GraphNode:
     Each node wraps a SubTask and tracks its dependencies,
     dependents, and execution state.
     """
+
     task: SubTask
     state: NodeState = NodeState.PENDING
     dependencies: set[str] = field(default_factory=set)  # task IDs this depends on
-    dependents: set[str] = field(default_factory=set)     # task IDs that depend on this
+    dependents: set[str] = field(default_factory=set)  # task IDs that depend on this
     result: str | None = None
     error: str | None = None
 
@@ -68,6 +69,7 @@ class ExecutionGraph:
     The graph tracks dependencies between tasks and enables
     parallel execution of independent branches.
     """
+
     nodes: dict[str, GraphNode] = field(default_factory=dict)
     intent_id: str = ""
     traces: list[Trace] = field(default_factory=list)
@@ -153,7 +155,8 @@ class ExecutionGraph:
     def is_complete(self) -> bool:
         """True when no more nodes can be executed."""
         return all(
-            n.state in (NodeState.COMPLETED, NodeState.FAILED, NodeState.SKIPPED, NodeState.REJECTED)
+            n.state
+            in (NodeState.COMPLETED, NodeState.FAILED, NodeState.SKIPPED, NodeState.REJECTED)
             for n in self.nodes.values()
         )
 
@@ -270,9 +273,7 @@ class GraphExecutor:
                 node.state = NodeState.RUNNING
                 node.task.status = TaskStatus.EXECUTING
 
-                task = asyncio.create_task(
-                    self._execute_node(graph, node, execute_fn)
-                )
+                task = asyncio.create_task(self._execute_node(graph, node, execute_fn))
                 pending_tasks.add(task)
 
             if not pending_tasks:

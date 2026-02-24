@@ -9,8 +9,7 @@ Covers:
 - Provider factory
 """
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -21,10 +20,9 @@ from kovrin.providers.base import (
     ProviderCapability,
     ProviderConfig,
 )
+from kovrin.providers.circuit_breaker import CircuitBreakerProvider, CircuitState
 from kovrin.providers.claude import ClaudeProvider
 from kovrin.providers.router import ModelRouter, TaskType
-from kovrin.providers.circuit_breaker import CircuitBreakerProvider, CircuitState
-
 
 # ─── ContentBlock ──────────────────────────────────────────
 
@@ -342,7 +340,9 @@ class TestCircuitBreaker:
     def test_supports_delegates(self):
         provider = self._make_provider()
         cb = CircuitBreakerProvider(provider)
-        assert cb.supports(ProviderCapability.TOOL_USE) == provider.supports(ProviderCapability.TOOL_USE)
+        assert cb.supports(ProviderCapability.TOOL_USE) == provider.supports(
+            ProviderCapability.TOOL_USE
+        )
 
 
 # ─── Factory ──────────────────────────────────────────────
@@ -351,27 +351,32 @@ class TestCircuitBreaker:
 class TestProviderFactory:
     def test_create_claude(self):
         from kovrin.providers import create_provider
+
         provider = create_provider("claude")
         assert isinstance(provider, ClaudeProvider)
 
     def test_create_anthropic_alias(self):
         from kovrin.providers import create_provider
+
         provider = create_provider("anthropic")
         assert isinstance(provider, ClaudeProvider)
 
     def test_unknown_provider_raises(self):
         from kovrin.providers import create_provider
+
         with pytest.raises(ValueError, match="Unknown provider"):
             create_provider("unknown_llm")
 
     def test_create_openai_requires_package(self):
         """OpenAI provider should raise ImportError if openai not installed."""
         from kovrin.providers import create_provider
+
         # This may succeed if openai is installed, or raise ImportError
         try:
             provider = create_provider("openai")
             # If it succeeds, it's an OpenAIProvider
             from kovrin.providers.openai import OpenAIProvider
+
             assert isinstance(provider, OpenAIProvider)
         except ImportError:
             pass  # Expected if openai package is not installed

@@ -49,9 +49,16 @@ class TestRegistration:
         """Key safety-critical models must be registered."""
         names = {m.__name__ for m in exporter.MODELS}
         required = {
-            "SubTask", "Trace", "ExecutionResult", "WatchdogAlert",
-            "ProofObligation", "ApprovalRequest", "DelegationToken",
-            "IntentV2", "PrmScore", "AgentDriftMetrics",
+            "SubTask",
+            "Trace",
+            "ExecutionResult",
+            "WatchdogAlert",
+            "ProofObligation",
+            "ApprovalRequest",
+            "DelegationToken",
+            "IntentV2",
+            "PrmScore",
+            "AgentDriftMetrics",
         }
         missing = required - names
         assert not missing, f"Missing critical models: {missing}"
@@ -60,8 +67,13 @@ class TestRegistration:
         """Key enums must be registered."""
         names = {e.__name__ for e in exporter.ENUMS}
         required = {
-            "RiskLevel", "TaskStatus", "SpeculationTier", "RoutingAction",
-            "ContainmentLevel", "AgentRole", "DriftLevel",
+            "RiskLevel",
+            "TaskStatus",
+            "SpeculationTier",
+            "RoutingAction",
+            "ContainmentLevel",
+            "AgentRole",
+            "DriftLevel",
         }
         missing = required - names
         assert not missing, f"Missing critical enums: {missing}"
@@ -115,20 +127,23 @@ class TestTypeScript:
         """Generated TS must contain all enum types."""
         ts = exporter.export_typescript()
         for enum_cls in exporter.ENUMS:
-            assert f"export type {enum_cls.__name__}" in ts, \
+            assert f"export type {enum_cls.__name__}" in ts, (
                 f"Missing TS type for {enum_cls.__name__}"
+            )
 
     def test_ts_contains_all_interfaces(self, exporter):
         """Generated TS must contain all model interfaces."""
         ts = exporter.export_typescript()
         for model in exporter.MODELS:
-            assert f"export interface {model.__name__}" in ts, \
+            assert f"export interface {model.__name__}" in ts, (
                 f"Missing TS interface for {model.__name__}"
+            )
 
     def test_ts_enum_values_match(self, exporter):
         """Enum values in TS must match Python."""
         ts = exporter.export_typescript()
         from kovrin.core.models import RiskLevel
+
         for member in RiskLevel:
             assert f"'{member.value}'" in ts
 
@@ -198,12 +213,7 @@ class TestParityValidation:
     def test_detects_missing_field(self, exporter):
         """Parity check should detect a missing field in an interface."""
         # Write a SubTask with only 'id' field
-        ts_content = (
-            "export type RiskLevel = 'LOW'\n"
-            "export interface SubTask {\n"
-            "  id: string\n"
-            "}\n"
-        )
+        ts_content = "export type RiskLevel = 'LOW'\nexport interface SubTask {\n  id: string\n}\n"
         with tempfile.NamedTemporaryFile(suffix=".ts", delete=False, mode="w") as f:
             f.write(ts_content)
             path = f.name
@@ -225,7 +235,8 @@ class TestCLI:
         """--list should output model and enum counts."""
         result = subprocess.run(
             [sys.executable, "-m", "kovrin.schema.exporter", "--list"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert "Models:" in result.stdout
         assert "Enums:" in result.stdout
@@ -236,7 +247,8 @@ class TestCLI:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = subprocess.run(
                 [sys.executable, "-m", "kovrin.schema.exporter", "--json-schema", tmpdir],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             assert result.returncode == 0
             files = list(Path(tmpdir).glob("*.json"))
@@ -249,7 +261,8 @@ class TestCLI:
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "kovrin.schema.exporter", "--typescript", path],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             assert result.returncode == 0
             assert Path(path).stat().st_size > 0
@@ -263,6 +276,7 @@ class TestCLI:
             pytest.skip("Dashboard TS file not found")
         result = subprocess.run(
             [sys.executable, "-m", "kovrin.schema.exporter", "--validate", str(ts_path)],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0

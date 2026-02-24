@@ -167,7 +167,7 @@ class MCTSExplorer:
         all_candidates = [n.candidate for n in self._nodes.values()]
         best = max(all_candidates, key=lambda c: c.score)
 
-        elapsed = (time.monotonic() - start) * 1000
+        _elapsed = (time.monotonic() - start) * 1000  # reserved for logging
 
         return best, all_candidates
 
@@ -175,11 +175,7 @@ class MCTSExplorer:
         """Select a node to expand using UCB1."""
         current = node
         while current.children:
-            children = [
-                self._nodes[cid]
-                for cid in current.children
-                if cid in self._nodes
-            ]
+            children = [self._nodes[cid] for cid in current.children if cid in self._nodes]
             if not children:
                 break
 
@@ -244,14 +240,10 @@ class MCTSExplorer:
         extra = _VARIANT_INSTRUCTIONS.get(variant, "")
 
         constraints_text = (
-            "\n".join(f"  - {c}" for c in intent.constraints)
-            if intent.constraints
-            else "  None"
+            "\n".join(f"  - {c}" for c in intent.constraints) if intent.constraints else "  None"
         )
         context_text = (
-            json.dumps(intent.context, indent=2, default=str)
-            if intent.context
-            else "  None"
+            json.dumps(intent.context, indent=2, default=str) if intent.context else "  None"
         )
 
         prompt = f"""You are the intent decomposition engine for Kovrin, a safety-first AI orchestration framework.

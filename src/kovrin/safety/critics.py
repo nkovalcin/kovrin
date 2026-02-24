@@ -16,7 +16,7 @@ is not executed.
 import anthropic
 
 from kovrin.core.constitutional import ConstitutionalCore
-from kovrin.core.models import ProofObligation, RiskLevel, SubTask, Trace
+from kovrin.core.models import ProofObligation, SubTask, Trace
 
 
 class SafetyCritic:
@@ -106,6 +106,7 @@ Return ONLY JSON, no other text."""
 
     def _parse(self, text: str) -> ProofObligation:
         import json
+
         try:
             start = text.find("{")
             end = text.rfind("}") + 1
@@ -179,6 +180,7 @@ Return ONLY JSON, no other text."""
 
     def _parse(self, text: str) -> ProofObligation:
         import json
+
         try:
             start = text.find("{")
             end = text.rfind("}") + 1
@@ -234,6 +236,7 @@ class CriticPipeline:
 
         # Run feasibility and policy in parallel
         import asyncio
+
         feasibility_result, policy_result = await asyncio.gather(
             self.feasibility.evaluate(subtask, task_context),
             self.policy.evaluate(subtask, constraints),
@@ -245,7 +248,9 @@ class CriticPipeline:
         return all_passed, all_obligations
 
     @staticmethod
-    def create_trace(subtask: SubTask, passed: bool, obligations: list[ProofObligation], intent_id: str) -> Trace:
+    def create_trace(
+        subtask: SubTask, passed: bool, obligations: list[ProofObligation], intent_id: str
+    ) -> Trace:
         """Create a trace event for the critic pipeline evaluation."""
         failed = [o for o in obligations if not o.passed]
         return Trace(

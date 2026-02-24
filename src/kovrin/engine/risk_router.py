@@ -15,7 +15,10 @@ Routing matrix:
   CRIT + any     -> HUMAN_APPROVAL
 """
 
-from typing import Callable
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable
 
 from kovrin.core.models import (
     ApprovalRequest,
@@ -50,7 +53,9 @@ class RiskRouter:
     }
 
     # Autonomy profile overrides (Phase 5)
-    _PROFILE_OVERRIDES: dict[AutonomyProfile, dict[tuple[RiskLevel, SpeculationTier], RoutingAction]] = {
+    _PROFILE_OVERRIDES: dict[
+        AutonomyProfile, dict[tuple[RiskLevel, SpeculationTier], RoutingAction]
+    ] = {
         AutonomyProfile.DEFAULT: {},
         AutonomyProfile.CAUTIOUS: {
             (RiskLevel.HIGH, SpeculationTier.FREE): RoutingAction.HUMAN_APPROVAL,
@@ -65,7 +70,8 @@ class RiskRouter:
         },
         AutonomyProfile.LOCKED: {
             (risk, tier): RoutingAction.HUMAN_APPROVAL
-            for risk in RiskLevel for tier in SpeculationTier
+            for risk in RiskLevel
+            for tier in SpeculationTier
         },
     }
 
@@ -120,7 +126,7 @@ class RiskRouter:
         self,
         subtask: SubTask,
         decision: RoutingDecision,
-        approval_callback: Callable[[ApprovalRequest], "asyncio.Future[bool]"] | None = None,
+        approval_callback: Callable[[ApprovalRequest], asyncio.Future[bool]] | None = None,
         timeout: float = 300.0,
     ) -> bool:
         """Request human approval.
@@ -155,18 +161,18 @@ class RiskRouter:
                 if asyncio.iscoroutine(result):
                     result = await result
                 return await asyncio.wait_for(asyncio.ensure_future(result), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return False
 
         # CLI mode: stdin prompt
-        print(f"\n{'='*60}")
-        print(f"HUMAN APPROVAL REQUIRED")
-        print(f"{'='*60}")
+        print(f"\n{'=' * 60}")
+        print("HUMAN APPROVAL REQUIRED")
+        print(f"{'=' * 60}")
         print(f"Task:   {subtask.description}")
         print(f"Risk:   {subtask.risk_level.value}")
         print(f"Tier:   {subtask.speculation_tier.value}")
         print(f"Reason: {decision.reason}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         try:
             response = input("Approve? [y/N]: ").strip().lower()

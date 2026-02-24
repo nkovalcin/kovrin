@@ -9,7 +9,7 @@ Verifies:
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -24,7 +24,6 @@ from kovrin.core.models import (
     SubTask,
 )
 from kovrin.engine.risk_router import RiskRouter
-
 
 # ─── Helpers ────────────────────────────────────────────────
 
@@ -110,9 +109,7 @@ class TestAsyncApproval:
             future.set_result(True)
             return future
 
-        result = await router.request_human_approval(
-            subtask, decision, approval_callback=callback
-        )
+        result = await router.request_human_approval(subtask, decision, approval_callback=callback)
         assert result is True
 
     @pytest.mark.asyncio
@@ -127,9 +124,7 @@ class TestAsyncApproval:
             future.set_result(False)
             return future
 
-        result = await router.request_human_approval(
-            subtask, decision, approval_callback=callback
-        )
+        result = await router.request_human_approval(subtask, decision, approval_callback=callback)
         assert result is False
 
     @pytest.mark.asyncio
@@ -166,9 +161,7 @@ class TestAsyncApproval:
             future.set_result(True)
             return future
 
-        await router.request_human_approval(
-            subtask, decision, approval_callback=callback
-        )
+        await router.request_human_approval(subtask, decision, approval_callback=callback)
 
         assert len(received_requests) == 1
         req = received_requests[0]
@@ -186,10 +179,12 @@ class TestAsyncApproval:
 
         async def callback(req: ApprovalRequest):
             future = asyncio.get_event_loop().create_future()
+
             # Simulate delayed approval
             async def resolve_later():
                 await asyncio.sleep(0.05)
                 future.set_result(True)
+
             asyncio.create_task(resolve_later())
             return future
 

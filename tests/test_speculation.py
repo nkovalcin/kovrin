@@ -3,11 +3,9 @@
 import pytest
 
 from kovrin.core.models import (
-    RiskLevel,
     SpeculationTier,
     SubTask,
     TaskStatus,
-    Trace,
 )
 from kovrin.engine.speculation import (
     Checkpoint,
@@ -107,7 +105,9 @@ class TestSpeculativeExecutor:
     @pytest.mark.asyncio
     async def test_guarded_checkpoint_and_commit(self):
         executor = SpeculativeExecutor()
-        task = SubTask(id="t-1", description="Guarded task", speculation_tier=SpeculationTier.GUARDED)
+        task = SubTask(
+            id="t-1", description="Guarded task", speculation_tier=SpeculationTier.GUARDED
+        )
 
         async def execute_fn(t, deps):
             return "guarded result"
@@ -122,7 +122,9 @@ class TestSpeculativeExecutor:
     @pytest.mark.asyncio
     async def test_guarded_rollback_on_validation_failure(self):
         executor = SpeculativeExecutor()
-        task = SubTask(id="t-1", description="Guarded task", speculation_tier=SpeculationTier.GUARDED)
+        task = SubTask(
+            id="t-1", description="Guarded task", speculation_tier=SpeculationTier.GUARDED
+        )
 
         async def execute_fn(t, deps):
             return "bad result"
@@ -140,7 +142,9 @@ class TestSpeculativeExecutor:
     @pytest.mark.asyncio
     async def test_guarded_rollback_on_exception(self):
         executor = SpeculativeExecutor()
-        task = SubTask(id="t-1", description="Guarded task", speculation_tier=SpeculationTier.GUARDED)
+        task = SubTask(
+            id="t-1", description="Guarded task", speculation_tier=SpeculationTier.GUARDED
+        )
 
         async def execute_fn(t, deps):
             raise ValueError("Something went wrong")

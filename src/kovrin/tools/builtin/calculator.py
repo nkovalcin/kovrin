@@ -11,12 +11,23 @@ from kovrin.tools.registry import RegisteredTool
 def _calculator(expression: str) -> str:
     """Evaluate a mathematical expression safely."""
     allowed_names = {
-        "abs": abs, "round": round, "min": min, "max": max,
-        "sum": sum, "pow": pow, "len": len,
-        "sqrt": math.sqrt, "log": math.log, "log10": math.log10,
-        "sin": math.sin, "cos": math.cos, "tan": math.tan,
-        "pi": math.pi, "e": math.e,
-        "ceil": math.ceil, "floor": math.floor,
+        "abs": abs,
+        "round": round,
+        "min": min,
+        "max": max,
+        "sum": sum,
+        "pow": pow,
+        "len": len,
+        "sqrt": math.sqrt,
+        "log": math.log,
+        "log10": math.log10,
+        "sin": math.sin,
+        "cos": math.cos,
+        "tan": math.tan,
+        "pi": math.pi,
+        "e": math.e,
+        "ceil": math.ceil,
+        "floor": math.floor,
     }
     try:
         result = eval(expression, {"__builtins__": {}}, allowed_names)  # noqa: S307

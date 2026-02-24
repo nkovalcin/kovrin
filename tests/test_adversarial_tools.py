@@ -8,6 +8,8 @@ These tests verify that the safety invariants hold under attack:
 5. Watchdog detects tool call anomalies
 """
 
+from datetime import UTC
+
 import pytest
 
 from kovrin.agents.tools import ToolDefinition
@@ -30,17 +32,45 @@ def _make_adversarial_registry() -> ToolRegistry:
 
     for name, risk, tier, cat, tags in [
         ("read_data", RiskLevel.LOW, SpeculationTier.FREE, ToolCategory.READ_ONLY, ["read_only"]),
-        ("write_file", RiskLevel.MEDIUM, SpeculationTier.GUARDED, ToolCategory.FILE_SYSTEM, ["filesystem"]),
-        ("exec_code", RiskLevel.HIGH, SpeculationTier.GUARDED, ToolCategory.CODE_EXECUTION, ["code_execution"]),
-        ("nuke_db", RiskLevel.CRITICAL, SpeculationTier.NONE, ToolCategory.EXTERNAL_API, ["critical", "database"]),
+        (
+            "write_file",
+            RiskLevel.MEDIUM,
+            SpeculationTier.GUARDED,
+            ToolCategory.FILE_SYSTEM,
+            ["filesystem"],
+        ),
+        (
+            "exec_code",
+            RiskLevel.HIGH,
+            SpeculationTier.GUARDED,
+            ToolCategory.CODE_EXECUTION,
+            ["code_execution"],
+        ),
+        (
+            "nuke_db",
+            RiskLevel.CRITICAL,
+            SpeculationTier.NONE,
+            ToolCategory.EXTERNAL_API,
+            ["critical", "database"],
+        ),
     ]:
-        registry.register(RegisteredTool(
-            definition=ToolDefinition(name=name, description=f"Test: {name}", input_schema={"type": "object", "properties": {}}),
-            risk_profile=ToolRiskProfile(
-                risk_level=risk, speculation_tier=tier, category=cat, scope_tags=tags, max_calls_per_task=3,
-            ),
-            handler=lambda: "ok",
-        ))
+        registry.register(
+            RegisteredTool(
+                definition=ToolDefinition(
+                    name=name,
+                    description=f"Test: {name}",
+                    input_schema={"type": "object", "properties": {}},
+                ),
+                risk_profile=ToolRiskProfile(
+                    risk_level=risk,
+                    speculation_tier=tier,
+                    category=cat,
+                    scope_tags=tags,
+                    max_calls_per_task=3,
+                ),
+                handler=lambda: "ok",
+            )
+        )
 
     return registry
 
@@ -55,9 +85,15 @@ class TestCriticalAlwaysHumanApproval:
         registry = _make_adversarial_registry()
         router = SafeToolRouter(registry=registry, risk_router=RiskRouter())
 
-        decision = await router.evaluate(ToolCallRequest(
-            tool_name="nuke_db", tool_input={}, tool_use_id="tc-1", task_id="t1", intent_id="i1",
-        ))
+        decision = await router.evaluate(
+            ToolCallRequest(
+                tool_name="nuke_db",
+                tool_input={},
+                tool_use_id="tc-1",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
         assert decision.action == RoutingAction.HUMAN_APPROVAL
         assert decision.allowed is False
 
@@ -67,7 +103,6 @@ class TestCriticalAlwaysHumanApproval:
 
         The RiskRouter's CRITICAL safety guard (line 98-99) ensures this.
         """
-        from kovrin.core.models import AutonomyProfile, AutonomySettings
 
         registry = _make_adversarial_registry()
         risk_router = RiskRouter()
@@ -75,9 +110,15 @@ class TestCriticalAlwaysHumanApproval:
         # Aggressive profile should NOT bypass CRITICAL guard
         router = SafeToolRouter(registry=registry, risk_router=risk_router)
 
-        decision = await router.evaluate(ToolCallRequest(
-            tool_name="nuke_db", tool_input={}, tool_use_id="tc-1", task_id="t1", intent_id="i1",
-        ))
+        decision = await router.evaluate(
+            ToolCallRequest(
+                tool_name="nuke_db",
+                tool_input={},
+                tool_use_id="tc-1",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
         assert decision.action == RoutingAction.HUMAN_APPROVAL
         assert decision.allowed is False
 
@@ -134,9 +175,15 @@ class TestBlockedCallsAudited:
         registry = _make_adversarial_registry()
         router = SafeToolRouter(registry=registry, risk_router=RiskRouter(), trace_log=trace_log)
 
-        await router.evaluate(ToolCallRequest(
-            tool_name="evil_tool", tool_input={}, tool_use_id="tc-1", task_id="t1", intent_id="i1",
-        ))
+        await router.evaluate(
+            ToolCallRequest(
+                tool_name="evil_tool",
+                tool_input={},
+                tool_use_id="tc-1",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
 
         events = trace_log.get_events()
         assert len(events) == 1
@@ -151,9 +198,15 @@ class TestBlockedCallsAudited:
         registry = _make_adversarial_registry()
         router = SafeToolRouter(registry=registry, risk_router=RiskRouter(), trace_log=trace_log)
 
-        await router.evaluate(ToolCallRequest(
-            tool_name="nuke_db", tool_input={}, tool_use_id="tc-1", task_id="t1", intent_id="i1",
-        ))
+        await router.evaluate(
+            ToolCallRequest(
+                tool_name="nuke_db",
+                tool_input={},
+                tool_use_id="tc-1",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
 
         events = trace_log.get_events()
         blocked_events = [e for e in events if e.trace.event_type == "TOOL_CALL_BLOCKED"]
@@ -169,9 +222,15 @@ class TestBlockedCallsAudited:
 
         # Exhaust rate limit (max 3)
         for i in range(4):
-            await router.evaluate(ToolCallRequest(
-                tool_name="read_data", tool_input={}, tool_use_id=f"tc-{i}", task_id="t1", intent_id="i1",
-            ))
+            await router.evaluate(
+                ToolCallRequest(
+                    tool_name="read_data",
+                    tool_input={},
+                    tool_use_id=f"tc-{i}",
+                    task_id="t1",
+                    intent_id="i1",
+                )
+            )
 
         events = trace_log.get_events()
         blocked = [e for e in events if e.trace.event_type == "TOOL_CALL_BLOCKED"]
@@ -193,15 +252,27 @@ class TestRateLimitBypass:
         router = SafeToolRouter(registry=registry, risk_router=RiskRouter())
 
         for i in range(3):
-            decision = await router.evaluate(ToolCallRequest(
-                tool_name="read_data", tool_input={}, tool_use_id=f"unique-{i}", task_id="t1", intent_id="i1",
-            ))
+            decision = await router.evaluate(
+                ToolCallRequest(
+                    tool_name="read_data",
+                    tool_input={},
+                    tool_use_id=f"unique-{i}",
+                    task_id="t1",
+                    intent_id="i1",
+                )
+            )
             assert decision.allowed is True
 
         # 4th call — different tool_use_id but same task+tool
-        decision = await router.evaluate(ToolCallRequest(
-            tool_name="read_data", tool_input={}, tool_use_id="bypass-attempt", task_id="t1", intent_id="i1",
-        ))
+        decision = await router.evaluate(
+            ToolCallRequest(
+                tool_name="read_data",
+                tool_input={},
+                tool_use_id="bypass-attempt",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
         assert decision.allowed is False
 
     @pytest.mark.asyncio
@@ -211,13 +282,25 @@ class TestRateLimitBypass:
         router = SafeToolRouter(registry=registry, risk_router=RiskRouter())
 
         for i in range(3):
-            await router.evaluate(ToolCallRequest(
-                tool_name="read_data", tool_input={"data": str(i)}, tool_use_id=f"tc-{i}", task_id="t1", intent_id="i1",
-            ))
+            await router.evaluate(
+                ToolCallRequest(
+                    tool_name="read_data",
+                    tool_input={"data": str(i)},
+                    tool_use_id=f"tc-{i}",
+                    task_id="t1",
+                    intent_id="i1",
+                )
+            )
 
-        decision = await router.evaluate(ToolCallRequest(
-            tool_name="read_data", tool_input={"data": "new"}, tool_use_id="tc-4", task_id="t1", intent_id="i1",
-        ))
+        decision = await router.evaluate(
+            ToolCallRequest(
+                tool_name="read_data",
+                tool_input={"data": "new"},
+                tool_use_id="tc-4",
+                task_id="t1",
+                intent_id="i1",
+            )
+        )
         assert decision.allowed is False
 
 
@@ -226,7 +309,8 @@ class TestWatchdogToolRules:
     """Verify watchdog temporal rules detect tool call anomalies."""
 
     def test_excessive_tool_call_rate_rule(self):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
+
         from kovrin.audit.trace_logger import HashedTrace
         from kovrin.core.models import Trace
         from kovrin.safety.watchdog import ExcessiveToolCallRate
@@ -234,7 +318,7 @@ class TestWatchdogToolRules:
         rule = ExcessiveToolCallRate(max_calls_per_minute=5)
 
         # Build history with 5 TOOL_CALL events in the last 30 seconds
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
         history = []
         for i in range(5):
             ht = HashedTrace(
@@ -275,17 +359,19 @@ class TestWatchdogToolRules:
         rule = ToolEscalationDetection()
 
         # History: LOW risk tool call
-        history = [HashedTrace(
-            trace=Trace(
-                event_type="TOOL_CALL",
-                task_id="t1",
-                intent_id="i1",
-                details={"risk_level": "LOW", "tool": "read_data"},
-            ),
-            hash="h1",
-            previous_hash="p1",
-            sequence=0,
-        )]
+        history = [
+            HashedTrace(
+                trace=Trace(
+                    event_type="TOOL_CALL",
+                    task_id="t1",
+                    intent_id="i1",
+                    details={"risk_level": "LOW", "tool": "read_data"},
+                ),
+                hash="h1",
+                previous_hash="p1",
+                sequence=0,
+            )
+        ]
 
         # New event: HIGH risk tool call for same task
         escalated = HashedTrace(
@@ -312,17 +398,19 @@ class TestWatchdogToolRules:
         rule = ToolCallAfterBlock()
 
         # History: tool was already blocked once
-        history = [HashedTrace(
-            trace=Trace(
-                event_type="TOOL_CALL_BLOCKED",
-                task_id="t1",
-                intent_id="i1",
-                details={"tool_name": "nuke_db"},
-            ),
-            hash="h1",
-            previous_hash="p1",
-            sequence=0,
-        )]
+        history = [
+            HashedTrace(
+                trace=Trace(
+                    event_type="TOOL_CALL_BLOCKED",
+                    task_id="t1",
+                    intent_id="i1",
+                    details={"tool_name": "nuke_db"},
+                ),
+                hash="h1",
+                previous_hash="p1",
+                sequence=0,
+            )
+        ]
 
         # Same tool blocked again
         repeat_block = HashedTrace(

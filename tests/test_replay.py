@@ -1,7 +1,5 @@
 """Tests for LATTICE Phase 5 — Decision Replay and Counterfactual."""
 
-import pytest
-
 from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.models import (
     AutonomyProfile,
@@ -18,8 +16,8 @@ from kovrin.core.models import (
 )
 from kovrin.engine.risk_router import RiskRouter
 
-
 # ─── Replay Model Tests ───────────────────────────────────
+
 
 class TestReplayModels:
     def test_replay_frame_defaults(self):
@@ -59,6 +57,7 @@ class TestReplayModels:
 
 
 # ─── Trace Logger Extension Tests ─────────────────────────
+
 
 class TestTraceLoggerExtensions:
     def test_get_events_since(self):
@@ -107,6 +106,7 @@ class TestTraceLoggerExtensions:
 
 
 # ─── Counterfactual Routing Tests ─────────────────────────
+
 
 class TestCounterfactualRouting:
     def test_counterfactual_detects_changes(self):

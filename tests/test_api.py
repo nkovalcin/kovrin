@@ -4,16 +4,13 @@ Covers REST endpoints and WebSocket connection.
 Uses httpx + FastAPI TestClient.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from kovrin.api.server import PipelineManager, RunRequest, StatusResponse, app, manager
 from kovrin.core.models import ExecutionResult
 
-
 # ─── Status Endpoint ─────────────────────────────────────────
+
 
 class TestStatusEndpoint:
     async def test_get_status(self):
@@ -30,6 +27,7 @@ class TestStatusEndpoint:
 
 
 # ─── Traces Endpoint ─────────────────────────────────────────
+
 
 class TestTracesEndpoint:
     async def test_get_traces_not_found(self):
@@ -68,6 +66,7 @@ class TestTracesEndpoint:
 
 # ─── Graph Endpoint ──────────────────────────────────────────
 
+
 class TestGraphEndpoint:
     async def test_get_graph_not_found(self):
         async with AsyncClient(
@@ -101,6 +100,7 @@ class TestGraphEndpoint:
 
 
 # ─── Result Endpoint ─────────────────────────────────────────
+
 
 class TestResultEndpoint:
     async def test_get_result_not_found(self):
@@ -138,6 +138,7 @@ class TestResultEndpoint:
 
 # ─── PipelineManager ─────────────────────────────────────────
 
+
 class TestPipelineManager:
     def test_initial_status(self):
         pm = PipelineManager()
@@ -157,6 +158,7 @@ class TestPipelineManager:
 
 
 # ─── Request/Response Models ─────────────────────────────────
+
 
 class TestRequestModels:
     def test_run_request_defaults(self):

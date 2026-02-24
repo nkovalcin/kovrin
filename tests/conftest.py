@@ -3,9 +3,7 @@
 import pytest
 
 from kovrin.core.models import (
-    ProofObligation,
     RiskLevel,
-    RoutingAction,
     SpeculationTier,
     SubTask,
     Trace,

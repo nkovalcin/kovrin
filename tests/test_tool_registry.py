@@ -174,25 +174,36 @@ class TestBuiltinTools:
 
         registry = ToolRegistry()
         register_all_builtins(registry)
-        assert len(registry) == 8  # calc, datetime, json, code, web_search, http, file_read, file_write
+        assert (
+            len(registry) == 8
+        )  # calc, datetime, json, code, web_search, http, file_read, file_write
 
     def test_builtin_tool_names(self):
         from kovrin.tools.builtin import register_all_builtins
 
         registry = ToolRegistry()
         register_all_builtins(registry)
-        expected = {"calculator", "current_datetime", "json_formatter",
-                    "code_execution", "web_search", "http_request",
-                    "file_read", "file_write"}
+        expected = {
+            "calculator",
+            "current_datetime",
+            "json_formatter",
+            "code_execution",
+            "web_search",
+            "http_request",
+            "file_read",
+            "file_write",
+        }
         actual = {t.name for t in registry.get_all()}
         assert actual == expected
 
     def test_code_exec_is_high_risk(self):
         from kovrin.tools.builtin import CODE_EXEC_TOOL
+
         assert CODE_EXEC_TOOL.risk_level == RiskLevel.HIGH
         assert CODE_EXEC_TOOL.speculation_tier == SpeculationTier.GUARDED
 
     def test_web_search_is_low_risk(self):
         from kovrin.tools.builtin import WEB_SEARCH_TOOL
+
         assert WEB_SEARCH_TOOL.risk_level == RiskLevel.LOW
         assert WEB_SEARCH_TOOL.speculation_tier == SpeculationTier.FREE

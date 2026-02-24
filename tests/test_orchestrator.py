@@ -1,7 +1,5 @@
 """Tests for LATTICE main orchestrator."""
 
-import pytest
-
 from kovrin.intent.schema import IntentV2, Performative, SemanticFrame
 
 
@@ -43,6 +41,7 @@ class TestIntentV2:
 
     def test_backward_compat_alias(self):
         from kovrin.intent.schema import Intent
+
         assert Intent is IntentV2
 
     def test_serialization_roundtrip(self):

@@ -18,7 +18,8 @@ execution.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import anthropic
 
@@ -26,7 +27,6 @@ from kovrin.core.models import (
     ApprovalRequest,
     AutonomySettings,
     RoutingAction,
-    RiskLevel,
     SubTask,
     TaskStatus,
     Trace,
@@ -34,6 +34,8 @@ from kovrin.core.models import (
 from kovrin.engine.risk_router import RiskRouter
 
 if TYPE_CHECKING:
+    import asyncio
+
     from kovrin.engine.prm import ProcessRewardModel
     from kovrin.tools.registry import ToolRegistry
     from kovrin.tools.router import SafeToolRouter
@@ -55,7 +57,7 @@ class TaskExecutor:
         self,
         client: anthropic.AsyncAnthropic | None = None,
         risk_router: RiskRouter | None = None,
-        approval_callback: Callable[[ApprovalRequest], "asyncio.Future[bool]"] | None = None,
+        approval_callback: Callable[[ApprovalRequest], asyncio.Future[bool]] | None = None,
         autonomy_settings: AutonomySettings | None = None,
         prm: ProcessRewardModel | None = None,
         tool_registry: ToolRegistry | None = None,
@@ -96,22 +98,26 @@ class TaskExecutor:
             )
             if not approved:
                 subtask.status = TaskStatus.AWAITING_HUMAN
-                traces.append(Trace(
-                    intent_id=subtask.parent_intent_id or "",
-                    task_id=subtask.id,
-                    event_type="HUMAN_REJECTED",
-                    description=f"Human rejected: {subtask.description[:60]}",
-                    risk_level=subtask.risk_level,
-                ))
+                traces.append(
+                    Trace(
+                        intent_id=subtask.parent_intent_id or "",
+                        task_id=subtask.id,
+                        event_type="HUMAN_REJECTED",
+                        description=f"Human rejected: {subtask.description[:60]}",
+                        risk_level=subtask.risk_level,
+                    )
+                )
                 raise RuntimeError(f"Human rejected task: {subtask.description[:80]}")
 
-            traces.append(Trace(
-                intent_id=subtask.parent_intent_id or "",
-                task_id=subtask.id,
-                event_type="HUMAN_APPROVED",
-                description=f"Human approved: {subtask.description[:60]}",
-                risk_level=subtask.risk_level,
-            ))
+            traces.append(
+                Trace(
+                    intent_id=subtask.parent_intent_id or "",
+                    task_id=subtask.id,
+                    event_type="HUMAN_APPROVED",
+                    description=f"Human approved: {subtask.description[:60]}",
+                    risk_level=subtask.risk_level,
+                )
+            )
 
         # Build execution prompt
         dep_context = ""
@@ -133,13 +139,15 @@ If it requires generation, be creative yet precise."""
 
         # Execute via Claude API
         subtask.status = TaskStatus.EXECUTING
-        traces.append(Trace(
-            intent_id=subtask.parent_intent_id or "",
-            task_id=subtask.id,
-            event_type="EXECUTION_START",
-            description=f"Executing: {subtask.description[:60]}",
-            risk_level=subtask.risk_level,
-        ))
+        traces.append(
+            Trace(
+                intent_id=subtask.parent_intent_id or "",
+                task_id=subtask.id,
+                event_type="EXECUTION_START",
+                description=f"Executing: {subtask.description[:60]}",
+                risk_level=subtask.risk_level,
+            )
+        )
 
         # Build API call kwargs
         messages = [{"role": "user", "content": prompt}]
@@ -187,6 +195,7 @@ If it requires generation, be creative yet precise."""
                         tool_result = await self._tool_router.execute_if_allowed(request, decision)
                     else:
                         from kovrin.agents.tools import ToolResult
+
                         tool_result = ToolResult(
                             tool_use_id=block.id,
                             content=f"[BLOCKED BY SAFETY] {decision.reason}",
@@ -195,36 +204,40 @@ If it requires generation, be creative yet precise."""
 
                     tool_results.append(tool_result)
 
-                    traces.append(Trace(
-                        intent_id=subtask.parent_intent_id or "",
-                        task_id=subtask.id,
-                        event_type="TOOL_CALL",
-                        description=f"Tool '{block.name}' → {decision.action.value}",
-                        details={
-                            "tool": block.name,
-                            "allowed": decision.allowed,
-                            "action": decision.action.value,
-                            "risk_level": decision.risk_level.value,
-                            "result_preview": tool_result.content[:200],
-                            "is_error": tool_result.is_error,
-                        },
-                        risk_level=decision.risk_level,
-                    ))
+                    traces.append(
+                        Trace(
+                            intent_id=subtask.parent_intent_id or "",
+                            task_id=subtask.id,
+                            event_type="TOOL_CALL",
+                            description=f"Tool '{block.name}' → {decision.action.value}",
+                            details={
+                                "tool": block.name,
+                                "allowed": decision.allowed,
+                                "action": decision.action.value,
+                                "risk_level": decision.risk_level.value,
+                                "result_preview": tool_result.content[:200],
+                                "is_error": tool_result.is_error,
+                            },
+                            risk_level=decision.risk_level,
+                        )
+                    )
 
             # Add assistant response + tool results to messages
             messages.append({"role": "assistant", "content": response.content})
-            messages.append({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tr.tool_use_id,
-                        "content": tr.content,
-                        "is_error": tr.is_error,
-                    }
-                    for tr in tool_results
-                ],
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tr.tool_use_id,
+                            "content": tr.content,
+                            "is_error": tr.is_error,
+                        }
+                        for tr in tool_results
+                    ],
+                }
+            )
 
             api_kwargs["messages"] = messages
             response = await self._client.messages.create(**api_kwargs)
@@ -238,31 +251,39 @@ If it requires generation, be creative yet precise."""
         subtask.status = TaskStatus.COMPLETED
         subtask.output = result
 
-        traces.append(Trace(
-            intent_id=subtask.parent_intent_id or "",
-            task_id=subtask.id,
-            event_type="EXECUTION_COMPLETE",
-            description=f"Completed: {subtask.description[:60]}",
-            details={"output_length": len(result), "tool_rounds": rounds},
-            risk_level=subtask.risk_level,
-        ))
+        traces.append(
+            Trace(
+                intent_id=subtask.parent_intent_id or "",
+                task_id=subtask.id,
+                event_type="EXECUTION_COMPLETE",
+                description=f"Completed: {subtask.description[:60]}",
+                details={"output_length": len(result), "tool_rounds": rounds},
+                risk_level=subtask.risk_level,
+            )
+        )
 
         # Optional PRM evaluation
         if self._prm:
             from kovrin.engine.prm import ProcessRewardModel
+
             prm_score = await self._prm.evaluate(subtask, result, intent_context)
-            traces.append(ProcessRewardModel.create_trace(
-                subtask, prm_score, subtask.parent_intent_id or ""
-            ))
+            traces.append(
+                ProcessRewardModel.create_trace(subtask, prm_score, subtask.parent_intent_id or "")
+            )
             if self._prm.is_below_threshold(prm_score):
-                traces.append(Trace(
-                    intent_id=subtask.parent_intent_id or "",
-                    task_id=subtask.id,
-                    event_type="PRM_LOW_QUALITY",
-                    description=f"PRM below threshold ({prm_score.aggregate_score:.2f} < {self._prm.threshold}): {subtask.description[:50]}",
-                    details={"aggregate_score": prm_score.aggregate_score, "threshold": self._prm.threshold},
-                    risk_level=subtask.risk_level,
-                ))
+                traces.append(
+                    Trace(
+                        intent_id=subtask.parent_intent_id or "",
+                        task_id=subtask.id,
+                        event_type="PRM_LOW_QUALITY",
+                        description=f"PRM below threshold ({prm_score.aggregate_score:.2f} < {self._prm.threshold}): {subtask.description[:50]}",
+                        details={
+                            "aggregate_score": prm_score.aggregate_score,
+                            "threshold": self._prm.threshold,
+                        },
+                        risk_level=subtask.risk_level,
+                    )
+                )
 
         return result, traces
 

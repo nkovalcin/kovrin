@@ -44,6 +44,7 @@ class OllamaProvider(LLMProvider):
     def _create_delegate(self) -> Any:
         """Create OpenAI provider targeting Ollama's API."""
         from kovrin.providers.openai import OpenAIProvider
+
         config = ProviderConfig(
             api_key="ollama",  # Ollama ignores API key but OpenAI SDK requires it
             model=self._config.model,

@@ -70,12 +70,14 @@ class Agent:
         system_prompt: str | None = None,
         client: anthropic.AsyncAnthropic | None = None,
         tools: ToolExecutor | None = None,
-        tool_router: "SafeToolRouter | None" = None,
+        tool_router: SafeToolRouter | None = None,
     ):
         self.name = name
         self.role = role
         self.capabilities = capabilities or []
-        self.system_prompt = system_prompt or ROLE_PROMPTS.get(role, ROLE_PROMPTS[AgentRole.SPECIALIST])
+        self.system_prompt = system_prompt or ROLE_PROMPTS.get(
+            role, ROLE_PROMPTS[AgentRole.SPECIALIST]
+        )
         self._client = client or anthropic.AsyncAnthropic()
         self.tools = tools
         self.tool_router = tool_router
@@ -84,7 +86,9 @@ class Agent:
     def info(self) -> AgentInfo:
         return AgentInfo(name=self.name, role=self.role, capabilities=self.capabilities)
 
-    async def execute(self, subtask: SubTask, context: dict[str, str] | None = None) -> tuple[str, list[Trace]]:
+    async def execute(
+        self, subtask: SubTask, context: dict[str, str] | None = None
+    ) -> tuple[str, list[Trace]]:
         """Execute a sub-task with this agent's specialized perspective.
 
         If tools are available, the agent can make tool calls which are
@@ -94,14 +98,19 @@ class Agent:
         """
         traces: list[Trace] = []
 
-        traces.append(Trace(
-            intent_id=subtask.parent_intent_id or "",
-            task_id=subtask.id,
-            event_type="AGENT_ASSIGNED",
-            description=f"Agent '{self.name}' ({self.role.value}) assigned to: {subtask.description[:60]}",
-            details={"agent": self.info.model_dump(), "tools": self.tools.tool_names if self.tools else []},
-            risk_level=subtask.risk_level,
-        ))
+        traces.append(
+            Trace(
+                intent_id=subtask.parent_intent_id or "",
+                task_id=subtask.id,
+                event_type="AGENT_ASSIGNED",
+                description=f"Agent '{self.name}' ({self.role.value}) assigned to: {subtask.description[:60]}",
+                details={
+                    "agent": self.info.model_dump(),
+                    "tools": self.tools.tool_names if self.tools else [],
+                },
+                risk_level=subtask.risk_level,
+            )
+        )
 
         dep_context = ""
         if context:
@@ -109,10 +118,12 @@ class Agent:
                 f"  [{tid}]: {result[:500]}" for tid, result in context.items()
             )
 
-        messages = [{
-            "role": "user",
-            "content": f"TASK: {subtask.description}\n{dep_context}",
-        }]
+        messages = [
+            {
+                "role": "user",
+                "content": f"TASK: {subtask.description}\n{dep_context}",
+            }
+        ]
 
         # Build API call kwargs
         api_kwargs: dict = {
@@ -153,9 +164,12 @@ class Agent:
                         decision = await self.tool_router.evaluate(request)
 
                         if decision.allowed:
-                            tool_result = await self.tool_router.execute_if_allowed(request, decision)
+                            tool_result = await self.tool_router.execute_if_allowed(
+                                request, decision
+                            )
                         else:
                             from kovrin.agents.tools import ToolResult
+
                             tool_result = ToolResult(
                                 tool_use_id=block.id,
                                 content=f"[BLOCKED BY SAFETY] {decision.reason}",
@@ -170,6 +184,7 @@ class Agent:
                         )
                     else:
                         from kovrin.agents.tools import ToolResult
+
                         tool_result = ToolResult(
                             tool_use_id=block.id,
                             content="No tool executor available",
@@ -178,34 +193,38 @@ class Agent:
 
                     tool_results.append(tool_result)
 
-                    traces.append(Trace(
-                        intent_id=subtask.parent_intent_id or "",
-                        task_id=subtask.id,
-                        event_type="TOOL_CALL",
-                        description=f"Tool '{block.name}' called by agent '{self.name}'",
-                        details={
-                            "tool": block.name,
-                            "input": block.input,
-                            "result": tool_result.content[:200],
-                            "is_error": tool_result.is_error,
-                            "safety_gated": self.tool_router is not None,
-                        },
-                    ))
+                    traces.append(
+                        Trace(
+                            intent_id=subtask.parent_intent_id or "",
+                            task_id=subtask.id,
+                            event_type="TOOL_CALL",
+                            description=f"Tool '{block.name}' called by agent '{self.name}'",
+                            details={
+                                "tool": block.name,
+                                "input": block.input,
+                                "result": tool_result.content[:200],
+                                "is_error": tool_result.is_error,
+                                "safety_gated": self.tool_router is not None,
+                            },
+                        )
+                    )
 
             # Add assistant response + tool results to messages
             messages.append({"role": "assistant", "content": response.content})
-            messages.append({
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tr.tool_use_id,
-                        "content": tr.content,
-                        "is_error": tr.is_error,
-                    }
-                    for tr in tool_results
-                ],
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tr.tool_use_id,
+                            "content": tr.content,
+                            "is_error": tr.is_error,
+                        }
+                        for tr in tool_results
+                    ],
+                }
+            )
 
             # Call API again with tool results
             api_kwargs["messages"] = messages
@@ -217,18 +236,20 @@ class Agent:
             if hasattr(block, "text"):
                 result += block.text
 
-        traces.append(Trace(
-            intent_id=subtask.parent_intent_id or "",
-            task_id=subtask.id,
-            event_type="AGENT_COMPLETED",
-            description=f"Agent '{self.name}' completed: {subtask.description[:60]}",
-            details={
-                "agent": self.name,
-                "output_length": len(result),
-                "tool_rounds": rounds,
-            },
-            risk_level=subtask.risk_level,
-        ))
+        traces.append(
+            Trace(
+                intent_id=subtask.parent_intent_id or "",
+                task_id=subtask.id,
+                event_type="AGENT_COMPLETED",
+                description=f"Agent '{self.name}' completed: {subtask.description[:60]}",
+                details={
+                    "agent": self.name,
+                    "output_length": len(result),
+                    "tool_rounds": rounds,
+                },
+                risk_level=subtask.risk_level,
+            )
+        )
 
         return result, traces
 
@@ -241,7 +262,12 @@ def create_default_agents(client: anthropic.AsyncAnthropic | None = None) -> lis
         Agent(
             name="Researcher",
             role=AgentRole.RESEARCHER,
-            capabilities=["data_analysis", "pattern_recognition", "source_evaluation", "comparison"],
+            capabilities=[
+                "data_analysis",
+                "pattern_recognition",
+                "source_evaluation",
+                "comparison",
+            ],
             client=client,
             tools=default_tools,
         ),
@@ -262,7 +288,12 @@ def create_default_agents(client: anthropic.AsyncAnthropic | None = None) -> lis
         Agent(
             name="Planner",
             role=AgentRole.PLANNER,
-            capabilities=["strategic_planning", "roadmap_creation", "dependency_analysis", "estimation"],
+            capabilities=[
+                "strategic_planning",
+                "roadmap_creation",
+                "dependency_analysis",
+                "estimation",
+            ],
             client=client,
             tools=default_tools,
         ),

@@ -1,13 +1,9 @@
 """Tests for LATTICE Phase 6 — Multi-agent Drift Detection."""
 
-import pytest
-
-from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
+from kovrin.audit.trace_logger import HashedTrace
 from kovrin.core.models import (
-    AgentDriftMetrics,
     ContainmentLevel,
     DriftLevel,
-    RiskLevel,
     Trace,
 )
 from kovrin.safety.watchdog import (
@@ -18,8 +14,8 @@ from kovrin.safety.watchdog import (
     make_agent_drift_rules,
 )
 
-
 # ─── Drift Tracker Tests ─────────────────────────────────
+
 
 class TestAgentDriftTracker:
     def test_empty_tracker(self):
@@ -105,8 +101,15 @@ class TestAgentDriftTracker:
 
 # ─── AgentCompetencyDrift Rule Tests ──────────────────────
 
+
 class TestAgentCompetencyDriftRule:
-    def _make_hashed(self, event_type: str, details: dict | None = None, task_id: str = "t1", intent_id: str = "i1") -> HashedTrace:
+    def _make_hashed(
+        self,
+        event_type: str,
+        details: dict | None = None,
+        task_id: str = "t1",
+        intent_id: str = "i1",
+    ) -> HashedTrace:
         trace = Trace(
             event_type=event_type,
             task_id=task_id,
@@ -134,10 +137,13 @@ class TestAgentCompetencyDriftRule:
             tracker.record("agent-1", f"t{i}", prm_score=0.45)
 
         rule = AgentCompetencyDrift(tracker)
-        event = self._make_hashed("PRM_EVALUATION", {
-            "agent_name": "agent-1",
-            "aggregate_score": 0.45,
-        })
+        event = self._make_hashed(
+            "PRM_EVALUATION",
+            {
+                "agent_name": "agent-1",
+                "aggregate_score": 0.45,
+            },
+        )
         alert = rule.check(event, [])
         assert alert is not None
         assert alert.severity == ContainmentLevel.WARN
@@ -148,10 +154,13 @@ class TestAgentCompetencyDriftRule:
             tracker.record("agent-1", f"t{i}", prm_score=0.3)
 
         rule = AgentCompetencyDrift(tracker)
-        event = self._make_hashed("PRM_EVALUATION", {
-            "agent_name": "agent-1",
-            "aggregate_score": 0.3,
-        })
+        event = self._make_hashed(
+            "PRM_EVALUATION",
+            {
+                "agent_name": "agent-1",
+                "aggregate_score": 0.3,
+            },
+        )
         alert = rule.check(event, [])
         assert alert is not None
         assert alert.severity == ContainmentLevel.PAUSE
@@ -162,10 +171,13 @@ class TestAgentCompetencyDriftRule:
             tracker.record("agent-1", f"t{i}", prm_score=0.15, success=False)
 
         rule = AgentCompetencyDrift(tracker)
-        event = self._make_hashed("PRM_EVALUATION", {
-            "agent_name": "agent-1",
-            "aggregate_score": 0.15,
-        })
+        event = self._make_hashed(
+            "PRM_EVALUATION",
+            {
+                "agent_name": "agent-1",
+                "aggregate_score": 0.15,
+            },
+        )
         alert = rule.check(event, [])
         assert alert is not None
         assert alert.severity == ContainmentLevel.KILL
@@ -173,8 +185,11 @@ class TestAgentCompetencyDriftRule:
 
 # ─── CrossAgentConsistency Rule Tests ─────────────────────
 
+
 class TestCrossAgentConsistencyRule:
-    def _make_hashed(self, event_type: str, desc: str, task_id: str, intent_id: str = "i1") -> HashedTrace:
+    def _make_hashed(
+        self, event_type: str, desc: str, task_id: str, intent_id: str = "i1"
+    ) -> HashedTrace:
         trace = Trace(
             event_type=event_type,
             description=desc,
@@ -218,6 +233,7 @@ class TestCrossAgentConsistencyRule:
 
 # ─── Make Agent Drift Rules Tests ─────────────────────────
 
+
 class TestMakeAgentDriftRules:
     def test_creates_two_rules(self):
         rules = make_agent_drift_rules()
@@ -232,6 +248,7 @@ class TestMakeAgentDriftRules:
 
 
 # ─── Watchdog Integration Tests ───────────────────────────
+
 
 class TestWatchdogAgentDrift:
     def test_watchdog_without_drift(self):

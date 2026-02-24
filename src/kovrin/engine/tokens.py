@@ -13,13 +13,11 @@ for multi-agent delegation. Each token:
 import hashlib
 import hmac
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from kovrin.core.models import (
     DelegationScope,
     DelegationToken,
-    RiskLevel,
-    RoutingAction,
     SubTask,
     Trace,
 )
@@ -45,11 +43,8 @@ class TokenAuthority:
     @property
     def active_tokens(self) -> list[DelegationToken]:
         """Return all non-revoked, non-expired tokens."""
-        now = datetime.now(timezone.utc)
-        return [
-            t for t in self._tokens.values()
-            if not t.revoked and t.expires_at > now
-        ]
+        now = datetime.now(UTC)
+        return [t for t in self._tokens.values() if not t.revoked and t.expires_at > now]
 
     def issue(
         self,
@@ -73,7 +68,7 @@ class TokenAuthority:
             ScopeViolationError: If child scope exceeds parent scope.
         """
         scope = scope or DelegationScope()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Enforce scope narrowing for sub-tokens
         if parent_token_id:
@@ -110,7 +105,7 @@ class TokenAuthority:
             return False, "Token has been revoked"
 
         # Check expiry
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if token.expires_at <= now:
             return False, "Token has expired"
 
@@ -184,18 +179,14 @@ class TokenAuthority:
         child_risks = set(child.allowed_risk_levels)
         if not child_risks.issubset(parent_risks):
             extra = child_risks - parent_risks
-            raise ScopeViolationError(
-                f"Child risk levels {extra} exceed parent scope"
-            )
+            raise ScopeViolationError(f"Child risk levels {extra} exceed parent scope")
 
         # Actions must be subset
         parent_actions = set(parent.allowed_actions)
         child_actions = set(child.allowed_actions)
         if not child_actions.issubset(parent_actions):
             extra = child_actions - parent_actions
-            raise ScopeViolationError(
-                f"Child actions {extra} exceed parent scope"
-            )
+            raise ScopeViolationError(f"Child actions {extra} exceed parent scope")
 
         # max_tasks must be <=
         if child.max_tasks > parent.max_tasks:

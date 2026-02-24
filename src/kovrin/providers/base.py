@@ -15,7 +15,6 @@ Key design decisions:
 from __future__ import annotations
 
 import asyncio
-import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
@@ -29,6 +28,7 @@ class ContentBlock(BaseModel):
     Abstracts over provider-specific formats (Anthropic's content blocks,
     OpenAI's choices, etc.) into a unified structure.
     """
+
     type: str = "text"  # "text" or "tool_use"
     text: str = ""
     tool_name: str = ""
@@ -42,6 +42,7 @@ class LLMResponse(BaseModel):
     Normalizes different API response formats into a single structure
     that the Kovrin engine can process uniformly.
     """
+
     content: list[ContentBlock] = Field(default_factory=list)
     stop_reason: str = "end_turn"
     model: str = ""
@@ -66,6 +67,7 @@ class LLMResponse(BaseModel):
 
 class ProviderConfig(BaseModel):
     """Configuration for an LLM provider."""
+
     api_key: str | None = None
     model: str = ""
     base_url: str | None = None
@@ -76,6 +78,7 @@ class ProviderConfig(BaseModel):
 
 class ProviderCapability(str, Enum):
     """Capabilities that providers may support."""
+
     TOOL_USE = "TOOL_USE"
     STREAMING = "STREAMING"
     VISION = "VISION"
@@ -167,7 +170,7 @@ class LLMProvider(ABC):
             except Exception as e:
                 last_error = e
                 if attempt < self._config.max_retries - 1:
-                    delay = self._config.retry_base_delay * (2 ** attempt)
+                    delay = self._config.retry_base_delay * (2**attempt)
                     await asyncio.sleep(delay)
 
         if model:

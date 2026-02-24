@@ -162,8 +162,7 @@ def connect(db_url: str) -> DbConnection:
             from psycopg.rows import dict_row
         except ImportError:
             raise ImportError(
-                "PostgreSQL support requires psycopg. "
-                "Install with: pip install 'kovrin[api]'"
+                "PostgreSQL support requires psycopg. Install with: pip install 'kovrin[api]'"
             ) from None
 
         conn = psycopg.connect(db_url, row_factory=dict_row, autocommit=False)

@@ -3,17 +3,17 @@
 Covers Agent, AgentRegistry, AgentCoordinator, and role inference.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from kovrin.agents.base import Agent, ROLE_PROMPTS, create_default_agents
-from kovrin.agents.coordinator import AgentCoordinator, _ROLE_KEYWORDS
+from kovrin.agents.base import ROLE_PROMPTS, Agent, create_default_agents
+from kovrin.agents.coordinator import _ROLE_KEYWORDS, AgentCoordinator
 from kovrin.agents.registry import AgentRegistry
-from kovrin.core.models import AgentInfo, AgentRole, RiskLevel, SubTask, Trace
-
+from kovrin.core.models import AgentInfo, AgentRole, SubTask
 
 # ─── Agent ────────────────────────────────────────────────────
+
 
 class TestAgent:
     def test_create_agent(self):
@@ -106,6 +106,7 @@ class TestAgent:
 
 # ─── Default Agents ───────────────────────────────────────────
 
+
 class TestDefaultAgents:
     def test_create_default_agents(self):
         agents = create_default_agents()
@@ -126,6 +127,7 @@ class TestDefaultAgents:
 
 
 # ─── AgentRegistry ────────────────────────────────────────────
+
 
 class TestAgentRegistry:
     def test_register_and_get(self):
@@ -220,6 +222,7 @@ class TestAgentRegistry:
 
 
 # ─── AgentCoordinator ────────────────────────────────────────
+
 
 class TestAgentCoordinator:
     def _make_coordinator(self):
@@ -349,6 +352,7 @@ class TestAgentCoordinator:
 
 
 # ─── Role Keywords Coverage ──────────────────────────────────
+
 
 class TestRoleKeywords:
     def test_all_roles_have_keywords(self):

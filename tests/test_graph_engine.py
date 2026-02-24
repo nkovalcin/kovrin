@@ -1,11 +1,9 @@
 """Tests for LATTICE Graph Execution Engine."""
 
-import asyncio
-
 import pytest
 
-from kovrin.core.models import RiskLevel, SubTask, TaskStatus
-from kovrin.engine.graph import ExecutionGraph, GraphExecutor, GraphNode, NodeState
+from kovrin.core.models import SubTask, TaskStatus
+from kovrin.engine.graph import ExecutionGraph, GraphExecutor, NodeState
 
 
 class TestExecutionGraph:

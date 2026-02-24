@@ -5,12 +5,12 @@ import json
 import pytest
 
 from kovrin.core.constitutional import (
+    _AXIOM_INTEGRITY_HASH,
     AXIOMS,
     ConstitutionalCore,
-    _AXIOM_INTEGRITY_HASH,
     _compute_axiom_hash,
 )
-from kovrin.core.models import ProofObligation, RiskLevel, SubTask
+from kovrin.core.models import ProofObligation
 
 
 class TestAxioms:
@@ -94,8 +94,20 @@ class TestConstitutionalCore:
 
     def test_create_trace_rejected(self, unsafe_task):
         obligations = [
-            ProofObligation(axiom_id=1, axiom_name="Human Agency", description="", passed=False, evidence="Removes override"),
-            ProofObligation(axiom_id=2, axiom_name="Harm Floor", description="", passed=False, evidence="High harm"),
+            ProofObligation(
+                axiom_id=1,
+                axiom_name="Human Agency",
+                description="",
+                passed=False,
+                evidence="Removes override",
+            ),
+            ProofObligation(
+                axiom_id=2,
+                axiom_name="Harm Floor",
+                description="",
+                passed=False,
+                evidence="High harm",
+            ),
         ]
         trace = ConstitutionalCore.create_trace(unsafe_task, obligations, "intent-1")
         assert "REJECTED" in trace.description
@@ -103,10 +115,12 @@ class TestConstitutionalCore:
 
     def test_parse_obligations_valid_json(self):
         core = ConstitutionalCore(client=None)
-        valid_json = json.dumps([
-            {"axiom_id": i, "axiom_name": AXIOMS[i-1].name, "passed": True, "evidence": "OK"}
-            for i in range(1, 6)
-        ])
+        valid_json = json.dumps(
+            [
+                {"axiom_id": i, "axiom_name": AXIOMS[i - 1].name, "passed": True, "evidence": "OK"}
+                for i in range(1, 6)
+            ]
+        )
         result = core._parse_obligations(valid_json)
         assert len(result) == 5
         assert all(o.passed for o in result)
@@ -121,11 +135,13 @@ class TestConstitutionalCore:
     def test_parse_obligations_missing_axiom_fills_gap(self):
         """If only 3 axioms returned, missing 2 should auto-fail."""
         core = ConstitutionalCore(client=None)
-        partial_json = json.dumps([
-            {"axiom_id": 1, "axiom_name": "Human Agency", "passed": True, "evidence": "OK"},
-            {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
-            {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
-        ])
+        partial_json = json.dumps(
+            [
+                {"axiom_id": 1, "axiom_name": "Human Agency", "passed": True, "evidence": "OK"},
+                {"axiom_id": 2, "axiom_name": "Harm Floor", "passed": True, "evidence": "OK"},
+                {"axiom_id": 3, "axiom_name": "Transparency", "passed": True, "evidence": "OK"},
+            ]
+        )
         result = core._parse_obligations(partial_json)
         # 3 passed + 2 auto-failed
         passed = [o for o in result if o.passed]

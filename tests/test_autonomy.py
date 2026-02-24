@@ -1,7 +1,5 @@
 """Tests for LATTICE Phase 5 — Autonomy Controls."""
 
-import pytest
-
 from kovrin.core.models import (
     AutonomyProfile,
     AutonomySettings,
@@ -13,8 +11,8 @@ from kovrin.core.models import (
 )
 from kovrin.engine.risk_router import RiskRouter
 
-
 # ─── Model Tests ──────────────────────────────────────────
+
 
 class TestPhase5Models:
     def test_view_mode_values(self):
@@ -45,8 +43,11 @@ class TestPhase5Models:
 
 # ─── Router Profile Override Tests ────────────────────────
 
+
 class TestRouterAutonomyOverrides:
-    def _task(self, risk: RiskLevel = RiskLevel.MEDIUM, tier: SpeculationTier = SpeculationTier.GUARDED) -> SubTask:
+    def _task(
+        self, risk: RiskLevel = RiskLevel.MEDIUM, tier: SpeculationTier = SpeculationTier.GUARDED
+    ) -> SubTask:
         return SubTask(description="Test task", risk_level=risk, speculation_tier=tier)
 
     def test_default_profile_no_change(self):
@@ -95,8 +96,9 @@ class TestRouterAutonomyOverrides:
         for risk in RiskLevel:
             for tier in SpeculationTier:
                 task = self._task(risk, tier)
-                assert router.route(task, settings).action == RoutingAction.HUMAN_APPROVAL, \
+                assert router.route(task, settings).action == RoutingAction.HUMAN_APPROVAL, (
                     f"LOCKED should force HUMAN for {risk}/{tier}"
+                )
 
     def test_critical_always_human_regardless_of_profile(self):
         """CRITICAL tasks always require HUMAN_APPROVAL — safety guard."""
@@ -104,8 +106,9 @@ class TestRouterAutonomyOverrides:
         task = self._task(RiskLevel.CRITICAL, SpeculationTier.FREE)
         for profile in AutonomyProfile:
             settings = AutonomySettings(profile=profile)
-            assert router.route(task, settings).action == RoutingAction.HUMAN_APPROVAL, \
+            assert router.route(task, settings).action == RoutingAction.HUMAN_APPROVAL, (
                 f"CRITICAL should be HUMAN even with profile={profile}"
+            )
 
     def test_cell_override_takes_precedence(self):
         """Cell-level override should override profile-level."""
@@ -142,6 +145,15 @@ class TestRouterAutonomyOverrides:
         """Calling route without settings produces same results as before Phase 5."""
         router = RiskRouter()
         # Check a few representative cells
-        assert router.route(self._task(RiskLevel.LOW, SpeculationTier.FREE)).action == RoutingAction.AUTO_EXECUTE
-        assert router.route(self._task(RiskLevel.MEDIUM, SpeculationTier.GUARDED)).action == RoutingAction.SANDBOX_REVIEW
-        assert router.route(self._task(RiskLevel.HIGH, SpeculationTier.NONE)).action == RoutingAction.HUMAN_APPROVAL
+        assert (
+            router.route(self._task(RiskLevel.LOW, SpeculationTier.FREE)).action
+            == RoutingAction.AUTO_EXECUTE
+        )
+        assert (
+            router.route(self._task(RiskLevel.MEDIUM, SpeculationTier.GUARDED)).action
+            == RoutingAction.SANDBOX_REVIEW
+        )
+        assert (
+            router.route(self._task(RiskLevel.HIGH, SpeculationTier.NONE)).action
+            == RoutingAction.HUMAN_APPROVAL
+        )

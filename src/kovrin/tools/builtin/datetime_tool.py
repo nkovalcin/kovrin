@@ -1,6 +1,6 @@
 """DateTime tool — current date/time in UTC."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from kovrin.agents.tools import ToolDefinition
 from kovrin.core.models import RiskLevel, SpeculationTier
@@ -10,7 +10,7 @@ from kovrin.tools.registry import RegisteredTool
 
 def _current_datetime() -> str:
     """Return the current date and time in ISO format."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 DATETIME_TOOL = RegisteredTool(

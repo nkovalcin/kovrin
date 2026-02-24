@@ -28,6 +28,7 @@ from kovrin.providers.base import LLMProvider, LLMResponse, ProviderCapability, 
 
 class CircuitState(str, Enum):
     """Circuit breaker states."""
+
     CLOSED = "CLOSED"
     OPEN = "OPEN"
     HALF_OPEN = "HALF_OPEN"
@@ -116,7 +117,7 @@ class CircuitBreakerProvider(LLMProvider):
                 self._state = CircuitState.CLOSED
             return response
 
-        except Exception as e:
+        except Exception:
             async with self._lock:
                 self._failure_count += 1
                 self._last_failure_time = time.monotonic()

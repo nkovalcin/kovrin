@@ -18,18 +18,17 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Callable, Awaitable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from kovrin.agents.tools import ToolResult
 from kovrin.core.models import (
-    RiskLevel,
     RoutingAction,
     RoutingDecision,
-    SpeculationTier,
     SubTask,
     Trace,
 )
-from kovrin.tools.models import ToolCallDecision, ToolCallRequest, ToolCallTrace
+from kovrin.tools.models import ToolCallDecision, ToolCallRequest
 from kovrin.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
@@ -116,10 +115,8 @@ class SafeToolRouter:
 
         # 3. DCT scope check (if token authority active)
         if self._token_authority and request.agent_id:
-            scope_tags = set(tool.risk_profile.scope_tags)
-            # This is checked via the scope's allowed_capabilities
-            # For now, we verify the tool category is accessible
-            pass  # DCT integration is optional; scope is checked at agent level
+            _scope_tags = set(tool.risk_profile.scope_tags)  # reserved for DCT check
+            # DCT integration is optional; scope is checked at agent level
 
         # 4. Create synthetic SubTask and route through RiskRouter
         synthetic = SubTask(
@@ -167,6 +164,7 @@ class SafeToolRouter:
             if self._approval_callback:
                 try:
                     from kovrin.core.models import ApprovalRequest
+
                     approval_req = ApprovalRequest(
                         intent_id=request.intent_id,
                         task_id=request.task_id,
@@ -179,13 +177,15 @@ class SafeToolRouter:
                     if asyncio.iscoroutine(result):
                         result = await result
                     approved = await asyncio.wait_for(asyncio.ensure_future(result), timeout=300.0)
-                except (asyncio.TimeoutError, Exception):
+                except (TimeoutError, Exception):
                     approved = False
 
                 decision = ToolCallDecision(
                     allowed=approved,
                     action=routing.action,
-                    reason=routing.reason if approved else f"Human rejected tool call: {request.tool_name}",
+                    reason=routing.reason
+                    if approved
+                    else f"Human rejected tool call: {request.tool_name}",
                     risk_level=tool.risk_level,
                     speculation_tier=tool.speculation_tier,
                     requires_approval=True,
@@ -196,7 +196,7 @@ class SafeToolRouter:
                 decision = ToolCallDecision(
                     allowed=False,
                     action=routing.action,
-                    reason=f"Tool call requires human approval but no approval mechanism available",
+                    reason="Tool call requires human approval but no approval mechanism available",
                     risk_level=tool.risk_level,
                     speculation_tier=tool.speculation_tier,
                     requires_approval=True,

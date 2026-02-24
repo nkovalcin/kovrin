@@ -17,7 +17,6 @@ executor — it cannot be disabled by agents.
 
 import asyncio
 import time
-from collections import defaultdict
 
 import anthropic
 
@@ -75,7 +74,7 @@ class ExcessiveFailureRate(TemporalRule):
     def __init__(self, threshold: float = 0.5):
         super().__init__(
             name="excessive_failure_rate",
-            description=f"Failure rate exceeds {threshold*100}%",
+            description=f"Failure rate exceeds {threshold * 100}%",
             severity=ContainmentLevel.PAUSE,
         )
         self.threshold = threshold
@@ -86,7 +85,8 @@ class ExcessiveFailureRate(TemporalRule):
 
         completed = sum(1 for h in history if h.trace.event_type == "EXECUTION_COMPLETE")
         failed = sum(
-            1 for h in history
+            1
+            for h in history
             if h.trace.event_type in ("HUMAN_REJECTED",)
             or (h.trace.event_type == "CRITIC_PIPELINE" and h.trace.l0_passed is False)
         )
@@ -95,7 +95,7 @@ class ExcessiveFailureRate(TemporalRule):
         if total >= 3 and failed / total > self.threshold:
             return WatchdogAlert(
                 severity=self.severity,
-                reason=f"Failure rate {failed}/{total} ({failed/total:.0%}) exceeds threshold {self.threshold:.0%}",
+                reason=f"Failure rate {failed}/{total} ({failed / total:.0%}) exceeds threshold {self.threshold:.0%}",
                 intent_id=event.trace.intent_id,
                 rule=self.name,
             )
@@ -119,8 +119,7 @@ class UnexpectedEventSequence(TemporalRule):
         # Rule: EXECUTION_COMPLETE without prior EXECUTION_START for same task
         if event.trace.event_type == "EXECUTION_COMPLETE":
             has_start = any(
-                h.trace.task_id == event.trace.task_id
-                and h.trace.event_type == "EXECUTION_START"
+                h.trace.task_id == event.trace.task_id and h.trace.event_type == "EXECUTION_START"
                 for h in history
             )
             if not has_start:
@@ -156,7 +155,8 @@ class ExcessiveToolCallRate(TemporalRule):
         # Count TOOL_CALL events in the last 60 seconds for this intent
         cutoff = event.trace.timestamp.timestamp() - 60.0
         recent_calls = sum(
-            1 for h in history
+            1
+            for h in history
             if h.trace.event_type == "TOOL_CALL"
             and h.trace.intent_id == event.trace.intent_id
             and h.trace.timestamp.timestamp() > cutoff
@@ -248,7 +248,8 @@ class ToolCallAfterBlock(TemporalRule):
 
         # Check if this tool was already blocked for this task
         previous_blocks = sum(
-            1 for h in history
+            1
+            for h in history
             if h.trace.event_type == "TOOL_CALL_BLOCKED"
             and h.trace.task_id == event.trace.task_id
             and (h.trace.details or {}).get("tool_name") == tool_name
@@ -317,7 +318,7 @@ class AgentDriftTracker:
             data["prm_scores"].append(prm_score)
             # Sliding window
             if len(data["prm_scores"]) > self._window_size:
-                data["prm_scores"] = data["prm_scores"][-self._window_size:]
+                data["prm_scores"] = data["prm_scores"][-self._window_size :]
 
     def get_metrics(self, agent_name: str) -> AgentDriftMetrics:
         """Get drift metrics for a specific agent."""
@@ -432,7 +433,15 @@ class CrossAgentConsistency(TemporalRule):
     """
 
     _POSITIVE = {"success", "approved", "valid", "correct", "feasible", "recommended", "agree"}
-    _NEGATIVE = {"failure", "rejected", "invalid", "incorrect", "infeasible", "not recommended", "disagree"}
+    _NEGATIVE = {
+        "failure",
+        "rejected",
+        "invalid",
+        "incorrect",
+        "infeasible",
+        "not recommended",
+        "disagree",
+    }
 
     def __init__(self):
         super().__init__(
@@ -661,14 +670,16 @@ Then provide a brief reason on the second line."""
 
         # Log the alert as a trace event
         if self._trace_log:
-            self._trace_log.append(Trace(
-                intent_id=alert.intent_id,
-                task_id=alert.task_id,
-                event_type=f"WATCHDOG_{alert.severity.value}",
-                description=f"Watchdog {alert.severity.value}: {alert.reason}",
-                details={
-                    "rule": alert.rule,
-                    "severity": alert.severity.value,
-                    "alert_id": alert.id,
-                },
-            ))
+            self._trace_log.append(
+                Trace(
+                    intent_id=alert.intent_id,
+                    task_id=alert.task_id,
+                    event_type=f"WATCHDOG_{alert.severity.value}",
+                    description=f"Watchdog {alert.severity.value}: {alert.reason}",
+                    details={
+                        "rule": alert.rule,
+                        "severity": alert.severity.value,
+                        "alert_id": alert.id,
+                    },
+                )
+            )

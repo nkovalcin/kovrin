@@ -4,9 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
-from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
+from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.models import RiskLevel, Trace
 
 
@@ -97,13 +95,15 @@ class TestImmutableTraceLog:
 
     def test_export_json(self):
         log = ImmutableTraceLog()
-        log.append(Trace(
-            intent_id="test",
-            event_type="E1",
-            description="Export test",
-            risk_level=RiskLevel.LOW,
-            l0_passed=True,
-        ))
+        log.append(
+            Trace(
+                intent_id="test",
+                event_type="E1",
+                description="Export test",
+                risk_level=RiskLevel.LOW,
+                l0_passed=True,
+            )
+        )
 
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             path = f.name

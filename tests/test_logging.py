@@ -3,8 +3,6 @@
 import json
 import logging
 
-import pytest
-
 from kovrin.logging import KovrinFormatter, configure_logging, get_logger
 
 

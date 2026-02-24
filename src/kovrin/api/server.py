@@ -13,6 +13,7 @@ import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
+from datetime import UTC
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,17 +30,12 @@ from kovrin.core.models import (
     ReplayFrame,
     ReplaySession,
     RiskLevel,
-    RoutingAction,
-    RoutingDecision,
-    SpeculationTier,
-    SubTask,
-    WatchdogAlert,
 )
 from kovrin.engine.risk_router import RiskRouter
 from kovrin.storage.repository import PipelineRepository
 
-
 # ─── Request/Response Models ────────────────────────────────
+
 
 class RunRequest(BaseModel):
     intent: str
@@ -76,6 +72,7 @@ class CounterfactualEvalRequest(BaseModel):
 
 # ─── Pipeline Manager ───────────────────────────────────────
 
+
 class PipelineManager:
     """Manages running and completed pipelines."""
 
@@ -108,14 +105,18 @@ class PipelineManager:
         self._autonomy_settings = settings
         self._kovrin.update_autonomy_settings(settings)
         self._repo.save_autonomy_settings(settings)
-        asyncio.create_task(self._broadcast({
-            "type": "autonomy_updated",
-            "data": {
-                "profile": settings.profile.value,
-                "override_matrix": settings.override_matrix,
-                "updated_at": settings.updated_at.isoformat(),
-            },
-        }))
+        asyncio.create_task(
+            self._broadcast(
+                {
+                    "type": "autonomy_updated",
+                    "data": {
+                        "profile": settings.profile.value,
+                        "override_matrix": settings.override_matrix,
+                        "updated_at": settings.updated_at.isoformat(),
+                    },
+                }
+            )
+        )
 
     def _handle_approval(self, request: ApprovalRequest) -> "asyncio.Future[bool]":
         """Approval callback called by RiskRouter when human approval is needed.
@@ -132,23 +133,31 @@ class PipelineManager:
         self._approval_requests[key] = request
 
         # Broadcast to WS clients (fire and forget)
-        asyncio.create_task(self._broadcast({
-            "type": "approval_request",
-            "intent_id": request.intent_id,
-            "data": {
-                "intent_id": request.intent_id,
-                "task_id": request.task_id,
-                "description": request.description,
-                "risk_level": request.risk_level.value,
-                "speculation_tier": request.speculation_tier.value,
-                "reason": request.reason,
-                "proof_obligations": [
-                    {"axiom_name": po.axiom_name, "passed": po.passed, "evidence": po.evidence}
-                    for po in request.proof_obligations
-                ],
-                "timestamp": request.timestamp.isoformat(),
-            },
-        }))
+        asyncio.create_task(
+            self._broadcast(
+                {
+                    "type": "approval_request",
+                    "intent_id": request.intent_id,
+                    "data": {
+                        "intent_id": request.intent_id,
+                        "task_id": request.task_id,
+                        "description": request.description,
+                        "risk_level": request.risk_level.value,
+                        "speculation_tier": request.speculation_tier.value,
+                        "reason": request.reason,
+                        "proof_obligations": [
+                            {
+                                "axiom_name": po.axiom_name,
+                                "passed": po.passed,
+                                "evidence": po.evidence,
+                            }
+                            for po in request.proof_obligations
+                        ],
+                        "timestamp": request.timestamp.isoformat(),
+                    },
+                }
+            )
+        )
 
         return future
 
@@ -169,6 +178,7 @@ class PipelineManager:
     async def start_pipeline(self, request: RunRequest) -> str:
         """Start a new pipeline and return its intent_id."""
         from kovrin.intent.schema import IntentV2
+
         intent_obj = IntentV2.simple(
             description=request.intent,
             constraints=request.constraints,
@@ -187,27 +197,31 @@ class PipelineManager:
         async def _on_trace(hashed: HashedTrace) -> None:
             """Broadcast each trace event to WS clients and collect hash data."""
             t = hashed.trace
-            hashed_trace_data.append({
-                "trace_id": t.id,
-                "hash": hashed.hash,
-                "previous_hash": hashed.previous_hash,
-                "sequence": hashed.sequence,
-            })
-            await self._broadcast({
-                "type": "trace",
-                "intent_id": t.intent_id or intent_id,
-                "data": {
-                    "id": t.id,
-                    "timestamp": t.timestamp.isoformat(),
-                    "intent_id": t.intent_id,
-                    "task_id": t.task_id,
-                    "event_type": t.event_type,
-                    "description": t.description,
-                    "details": t.details or {},
-                    "risk_level": t.risk_level.value if t.risk_level else None,
-                    "l0_passed": t.l0_passed,
-                },
-            })
+            hashed_trace_data.append(
+                {
+                    "trace_id": t.id,
+                    "hash": hashed.hash,
+                    "previous_hash": hashed.previous_hash,
+                    "sequence": hashed.sequence,
+                }
+            )
+            await self._broadcast(
+                {
+                    "type": "trace",
+                    "intent_id": t.intent_id or intent_id,
+                    "data": {
+                        "id": t.id,
+                        "timestamp": t.timestamp.isoformat(),
+                        "intent_id": t.intent_id,
+                        "task_id": t.task_id,
+                        "event_type": t.event_type,
+                        "description": t.description,
+                        "details": t.details or {},
+                        "risk_level": t.risk_level.value if t.risk_level else None,
+                        "l0_passed": t.l0_passed,
+                    },
+                }
+            )
 
         trace_log.subscribe(_on_trace)
 
@@ -241,11 +255,13 @@ class PipelineManager:
         except Exception:
             pass  # Persistence errors should not break the pipeline
 
-        await self._broadcast({
-            "type": "pipeline_complete",
-            "intent_id": intent_id,
-            "success": self._results[intent_id].success,
-        })
+        await self._broadcast(
+            {
+                "type": "pipeline_complete",
+                "intent_id": intent_id,
+                "success": self._results[intent_id].success,
+            }
+        )
 
     async def _broadcast(self, message: dict) -> None:
         """Send a message to all connected WebSocket clients."""
@@ -338,10 +354,12 @@ except ImportError:
 
 # ─── Helpers ──────────────────────────────────────────────────
 
+
 def _require_manager() -> PipelineManager:
     """Return the manager or raise 503 if not initialized."""
     if manager is None:
         from fastapi import HTTPException
+
         raise HTTPException(
             status_code=503,
             detail=f"Kovrin API not ready. Init error: {_init_error or 'still starting'}",
@@ -350,6 +368,7 @@ def _require_manager() -> PipelineManager:
 
 
 # ─── Health & Status Endpoints ────────────────────────────────
+
 
 @app.get("/api/health")
 async def health_check() -> dict:
@@ -445,6 +464,7 @@ async def approve_task(intent_id: str, task_id: str, body: ApproveRequest) -> di
 
 # ─── Autonomy Endpoints ─────────────────────────────────────
 
+
 @app.get("/api/autonomy")
 async def get_autonomy() -> dict:
     """Get current autonomy settings."""
@@ -461,11 +481,12 @@ async def get_autonomy() -> dict:
 async def update_autonomy(body: AutonomyUpdateRequest) -> dict:
     """Update autonomy settings. Persists to DB and broadcasts via WS."""
     m = _require_manager()
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     settings = AutonomySettings(
         profile=AutonomyProfile(body.profile),
         override_matrix=body.override_matrix,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
     m.update_autonomy_settings(settings)
     return {
@@ -477,6 +498,7 @@ async def update_autonomy(body: AutonomyUpdateRequest) -> dict:
 
 
 # ─── Replay Endpoints ──────────────────────────────────────
+
 
 @app.get("/api/replay/{intent_id}")
 async def get_replay(intent_id: str) -> dict:
@@ -550,15 +572,17 @@ async def evaluate_counterfactual(intent_id: str, body: CounterfactualEvalReques
         counterfactual = router.route(subtask, hypothetical)
 
         changed = actual.action != counterfactual.action
-        diffs.append(CounterfactualResult(
-            task_id=subtask.id,
-            task_description=subtask.description[:80],
-            actual_action=actual.action,
-            counterfactual_action=counterfactual.action,
-            changed=changed,
-            risk_level=subtask.risk_level,
-            speculation_tier=subtask.speculation_tier,
-        ).model_dump())
+        diffs.append(
+            CounterfactualResult(
+                task_id=subtask.id,
+                task_description=subtask.description[:80],
+                actual_action=actual.action,
+                counterfactual_action=counterfactual.action,
+                changed=changed,
+                risk_level=subtask.risk_level,
+                speculation_tier=subtask.speculation_tier,
+            ).model_dump()
+        )
 
     return {
         "intent_id": intent_id,
@@ -570,6 +594,7 @@ async def evaluate_counterfactual(intent_id: str, body: CounterfactualEvalReques
 
 # ─── Phase 6: PRM, Tokens, Topology, Drift Endpoints ────────
 
+
 @app.get("/api/prm/{intent_id}")
 async def get_prm_scores(intent_id: str) -> dict:
     """Get PRM (Process Reward Model) scores for a pipeline's tasks."""
@@ -579,22 +604,21 @@ async def get_prm_scores(intent_id: str) -> dict:
         return {"error": "Pipeline not found", "intent_id": intent_id}
 
     # Extract PRM_EVALUATION traces
-    prm_traces = [
-        t for t in result.traces
-        if t.event_type == "PRM_EVALUATION"
-    ]
+    prm_traces = [t for t in result.traces if t.event_type == "PRM_EVALUATION"]
 
     scores = []
     for t in prm_traces:
         d = t.details or {}
-        scores.append({
-            "task_id": t.task_id,
-            "aggregate_score": d.get("aggregate_score", 0.0),
-            "step_count": d.get("step_count", 0),
-            "step_scores": d.get("step_scores", []),
-            "reasoning": d.get("reasoning", ""),
-            "timestamp": t.timestamp.isoformat(),
-        })
+        scores.append(
+            {
+                "task_id": t.task_id,
+                "aggregate_score": d.get("aggregate_score", 0.0),
+                "step_count": d.get("step_count", 0),
+                "step_scores": d.get("step_scores", []),
+                "reasoning": d.get("reasoning", ""),
+                "timestamp": t.timestamp.isoformat(),
+            }
+        )
 
     return {
         "intent_id": intent_id,
@@ -607,7 +631,7 @@ async def get_prm_scores(intent_id: str) -> dict:
 async def get_active_tokens() -> dict:
     """Get active delegation capability tokens."""
     m = _require_manager()
-    if not hasattr(m._kovrin, '_token_authority') or not m._kovrin._token_authority:
+    if not hasattr(m._kovrin, "_token_authority") or not m._kovrin._token_authority:
         return {"tokens": [], "total": 0, "enabled": False}
 
     tokens = m._kovrin._token_authority.active_tokens
@@ -644,10 +668,7 @@ async def get_topology(intent_id: str) -> dict:
         return {"error": "Pipeline not found", "intent_id": intent_id}
 
     # Extract TOPOLOGY_SELECTED trace
-    topo_traces = [
-        t for t in result.traces
-        if t.event_type == "TOPOLOGY_SELECTED"
-    ]
+    topo_traces = [t for t in result.traces if t.event_type == "TOPOLOGY_SELECTED"]
 
     if not topo_traces:
         return {
@@ -670,7 +691,7 @@ async def get_topology(intent_id: str) -> dict:
 async def get_drift_metrics() -> dict:
     """Get per-agent drift metrics from the watchdog."""
     m = _require_manager()
-    if not hasattr(m._kovrin, '_watchdog') or not m._kovrin._watchdog:
+    if not hasattr(m._kovrin, "_watchdog") or not m._kovrin._watchdog:
         return {"agents": [], "total": 0, "enabled": False}
 
     tracker = m._kovrin._watchdog.drift_tracker
@@ -696,6 +717,7 @@ async def get_drift_metrics() -> dict:
 
 
 # ─── WebSocket ───────────────────────────────────────────────
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

@@ -1,7 +1,5 @@
 """Allow running as: python -m kovrin.schema"""
 
-import sys
-
 from kovrin.schema.exporter import main
 
 if __name__ == "__main__":

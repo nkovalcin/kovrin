@@ -56,14 +56,14 @@ async def main():
     print(f"Trace events: {len(result.traces)}")
 
     if result.rejected_tasks:
-        print(f"\nRejected tasks:")
+        print("\nRejected tasks:")
         for task in result.rejected_tasks:
             failed = [o for o in task.proof_obligations if not o.passed]
             print(f"  - {task.description[:60]}")
             for o in failed:
                 print(f"    FAILED: {o.axiom_name} — {o.evidence[:80]}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("OUTPUT")
     print("=" * 60)
     print(result.output[:3000] if result.output else "No output")

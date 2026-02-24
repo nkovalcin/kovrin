@@ -14,18 +14,18 @@ always use the strongest available model (Claude by default).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
-from kovrin.providers.base import LLMProvider, ProviderConfig
+from kovrin.providers.base import LLMProvider
 
 
 class TaskType(str, Enum):
     """Classification of LLM task types for routing."""
-    SAFETY_CRITICAL = "SAFETY_CRITICAL"   # Constitutional, Critics — strongest model
-    EXECUTION = "EXECUTION"               # Task execution — configurable
-    PARSING = "PARSING"                   # Intent parsing — configurable
-    ANALYSIS = "ANALYSIS"                 # Confidence, PRM — configurable
-    GENERAL = "GENERAL"                   # Fallback — cheapest model
+
+    SAFETY_CRITICAL = "SAFETY_CRITICAL"  # Constitutional, Critics — strongest model
+    EXECUTION = "EXECUTION"  # Task execution — configurable
+    PARSING = "PARSING"  # Intent parsing — configurable
+    ANALYSIS = "ANALYSIS"  # Confidence, PRM — configurable
+    GENERAL = "GENERAL"  # Fallback — cheapest model
 
 
 class ModelRouter:
@@ -53,6 +53,7 @@ class ModelRouter:
         """Get the primary provider (creates Claude if needed)."""
         if self._primary is None:
             from kovrin.providers.claude import ClaudeProvider
+
             self._primary = ClaudeProvider()
             self._providers[self._primary.name] = self._primary
         return self._primary

@@ -1,7 +1,6 @@
 """Tests for LATTICE Phase 6 — Delegation Capability Tokens."""
 
 import time
-from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -14,8 +13,8 @@ from kovrin.core.models import (
 )
 from kovrin.engine.tokens import ScopeViolationError, TokenAuthority
 
-
 # ─── Model Tests ──────────────────────────────────────────
+
 
 class TestTokenModels:
     def test_delegation_scope_defaults(self):
@@ -45,6 +44,7 @@ class TestTokenModels:
 
 
 # ─── Token Authority Tests ────────────────────────────────
+
 
 class TestTokenAuthority:
     def test_issue_basic(self):
@@ -122,6 +122,7 @@ class TestTokenAuthority:
 
 # ─── Scope Check Tests ───────────────────────────────────
 
+
 class TestScopeCheck:
     def test_scope_allows_task(self):
         auth = TokenAuthority()
@@ -165,6 +166,7 @@ class TestScopeCheck:
 
 # ─── Revocation Tests ────────────────────────────────────
 
+
 class TestRevocation:
     def test_revoke_single(self):
         auth = TokenAuthority()
@@ -176,8 +178,12 @@ class TestRevocation:
     def test_revoke_cascades_to_children(self):
         auth = TokenAuthority()
         parent = auth.issue("agent-1", scope=DelegationScope(max_tasks=5))
-        child1 = auth.issue("agent-2", scope=DelegationScope(max_tasks=3), parent_token_id=parent.id)
-        child2 = auth.issue("agent-3", scope=DelegationScope(max_tasks=2), parent_token_id=parent.id)
+        child1 = auth.issue(
+            "agent-2", scope=DelegationScope(max_tasks=3), parent_token_id=parent.id
+        )
+        child2 = auth.issue(
+            "agent-3", scope=DelegationScope(max_tasks=2), parent_token_id=parent.id
+        )
 
         count = auth.revoke(parent.id)
         assert count == 3
@@ -199,6 +205,7 @@ class TestRevocation:
 
 
 # ─── Scope Narrowing Tests ────────────────────────────────
+
 
 class TestScopeNarrowing:
     def test_equal_scope_allowed(self):
@@ -261,6 +268,7 @@ class TestScopeNarrowing:
 
 
 # ─── Trace Tests ──────────────────────────────────────────
+
 
 class TestTokenTrace:
     def test_create_trace(self):

@@ -1,8 +1,6 @@
 """Tests for LATTICE Phase 6 — Automatic Topology Selection."""
 
-import pytest
-
-from kovrin.core.models import RiskLevel, SubTask, TopologyRecommendation, TopologyType
+from kovrin.core.models import SubTask, TopologyRecommendation, TopologyType
 from kovrin.engine.graph import ExecutionGraph
 from kovrin.engine.topology import TopologyAnalyzer
 

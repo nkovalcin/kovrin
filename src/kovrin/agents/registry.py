@@ -5,10 +5,10 @@ Central registry for all available agents. Supports registration,
 lookup by role or capabilities, and default agent creation.
 """
 
+import anthropic
+
 from kovrin.agents.base import Agent, create_default_agents
 from kovrin.core.models import AgentRole
-
-import anthropic
 
 
 class AgentRegistry:
@@ -38,7 +38,9 @@ class AgentRegistry:
         """Find all agents that have a specific capability."""
         return [a for a in self._agents.values() if capability in a.capabilities]
 
-    def find_best(self, role: AgentRole | None = None, capabilities: list[str] | None = None) -> Agent | None:
+    def find_best(
+        self, role: AgentRole | None = None, capabilities: list[str] | None = None
+    ) -> Agent | None:
         """Find the best matching agent.
 
         Scoring: role match = 10 points, each capability match = 1 point.

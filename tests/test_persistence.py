@@ -9,8 +9,6 @@ Verifies:
 - In-memory database for testing
 """
 
-import pytest
-
 from kovrin.core.models import (
     ExecutionResult,
     RiskLevel,
@@ -19,7 +17,6 @@ from kovrin.core.models import (
     Trace,
 )
 from kovrin.storage.repository import PipelineRepository
-
 
 # ─── Helpers ────────────────────────────────────────────────
 
