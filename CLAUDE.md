@@ -42,10 +42,12 @@ Framework kde bezpečnosť AI agentov nie je runtime filter, ale **architektonic
 | Metrika | Hodnota |
 |---------|---------|
 | Fázy whitepaperu | 6/6 implementovaných (Phase 7 neexistuje) |
-| Testy | **480** (z toho 29 adversarial) |
+| Testy | **734** (z toho 41 adversarial) |
 | TLA+ špecifikácie | **8 modulov**, 10 safety invariantov |
 | Pydantic modely | **29 modelov, 13 enumov** |
 | Dashboard komponenty | **12** (React/TypeScript) |
+| LLM Providers | **3** (Claude, OpenAI, Ollama) |
+| Built-in Tools | **8** (safety-gated, Merkle-audited) |
 | Virtual env | `.venv/bin/python` |
 
 ---
@@ -82,6 +84,19 @@ kovrin/
 │   │   ├── base.py            # BaseAgent
 │   │   ├── coordinator.py     # AgentCoordinator
 │   │   └── registry.py        # AgentRegistry
+│   ├── tools/                 # Safety-gated tool execution (Phase 1)
+│   │   ├── models.py          # ToolRiskProfile, ToolCallRequest, ToolCallDecision
+│   │   ├── registry.py        # ToolRegistry — central tool registration
+│   │   ├── router.py          # SafeToolRouter — safety pipeline for tool calls
+│   │   ├── sandbox.py         # SandboxedExecutor — isolated execution
+│   │   └── builtin/           # 8 built-in tools (calc, datetime, json, code, web, http, file r/w)
+│   ├── providers/             # Multi-model abstraction (Phase 2)
+│   │   ├── base.py            # LLMProvider ABC, LLMResponse, ContentBlock
+│   │   ├── claude.py          # ClaudeProvider (Anthropic SDK wrapper)
+│   │   ├── openai.py          # OpenAIProvider (GPT-4o, o1, compatible APIs)
+│   │   ├── ollama.py          # OllamaProvider (local models)
+│   │   ├── router.py          # ModelRouter — task-based model selection
+│   │   └── circuit_breaker.py # CircuitBreakerProvider — fault tolerance
 │   ├── api/
 │   │   └── server.py          # FastAPI — REST + WebSocket + SSE
 │   ├── schema/
@@ -89,6 +104,9 @@ kovrin/
 │   │   └── __main__.py        # CLI: python -m kovrin.schema
 │   ├── storage/
 │   │   └── repository.py      # SQLite persistence
+│   ├── exceptions.py          # KovrinError hierarchy (9 exception types)
+│   ├── logging.py             # Structured logging (JSON + human-readable)
+│   ├── cli.py                 # CLI: kovrin run, verify, audit, serve, status
 │   └── examples/
 │       └── company_ops.py     # Demo
 ├── specs/                   # TLA+ formálna verifikácia (8 modulov)
@@ -108,9 +126,14 @@ kovrin/
 │   │   ├── api/client.ts
 │   │   └── components/        # 12 komponentov
 │   └── package.json
-├── tests/                   # 480 testov
+├── tests/                   # 734 testov
 │   ├── test_adversarial.py        # 30 adversarial (P0 + P1)
 │   ├── test_adversarial_tokens.py # 11 adversarial (P2)
+│   ├── test_adversarial_tools.py  # 13 adversarial (tool safety)
+│   ├── test_providers.py          # Provider abstraction tests
+│   ├── test_web_search.py         # Brave Search integration tests
+│   ├── test_exceptions.py         # Exception hierarchy tests
+│   ├── test_cli.py                # CLI command tests
 │   ├── test_schema_exporter.py    # 24 testov
 │   └── test_*.py                  # Unit + integration
 ├── docs/
@@ -289,10 +312,18 @@ source .venv/bin/activate            # Aktivuj venv
 .venv/bin/python -m ...
 
 # ── Testy ────────────────────────────────────────────────────────────────────
-.venv/bin/python -m pytest tests/ -v                              # Všetky (480)
+.venv/bin/python -m pytest tests/ -v                              # Všetky (734)
 .venv/bin/python -m pytest tests/ -m adversarial -v              # Adversarial (41)
 .venv/bin/python -m pytest tests/test_schema_exporter.py -v      # Schema (24)
 .venv/bin/python -m pytest tests/ -m "not integration" -v        # Bez API calls
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+.venv/bin/python -m kovrin.cli run "Search for Python 3.13 features" --tools
+.venv/bin/python -m kovrin.cli verify                             # Merkle chain integrity
+.venv/bin/python -m kovrin.cli audit                              # List pipelines
+.venv/bin/python -m kovrin.cli audit <intent_id>                  # View audit trail
+.venv/bin/python -m kovrin.cli serve --port 8000                  # Start API server
+.venv/bin/python -m kovrin.cli status                             # Show framework status
 
 # ── Schema export ─────────────────────────────────────────────────────────────
 .venv/bin/python -m kovrin.schema.exporter --list
@@ -328,21 +359,27 @@ source .venv/bin/activate            # Aktivuj venv
 | `dashboard/src/types/kovrin.ts` | ✅ Vyriešené | Regenerované cez SchemaExporter (29 models, 13 enums). Udržiavať cez `--typescript` exporter. |
 | `docs/CLAUDE_OPENSOURCE.md` je TARGET súbor | 🟡 Stredná | Obsahuje idealizovanú štruktúru, nie súčasný stav. Po cleanup merge do tohto CLAUDE.md. |
 | SQLite v produkcii | 🟡 Stredná | Pre produkciu → Temporal/EventStoreDB/Kafka |
-| Len Claude API | 🟡 Stredná | Chýba OpenAI, Google, Mistral, Ollama |
+| Multi-model | ✅ Vyriešené | ClaudeProvider, OpenAIProvider, OllamaProvider + ModelRouter |
+| CLI | ✅ Vyriešené | `kovrin run`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
+| GitHub Actions CI | ✅ Vyriešené | pytest + coverage + mypy + ruff + pip-audit |
+| Tool execution | ✅ Vyriešené | 8 safety-gated tools, SafeToolRouter, Brave Search API |
+| Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (9 types) |
+| Structured logging | ✅ Vyriešené | JSON + human-readable via kovrin.logging |
 
 ---
 
 ## Čo chýba pre produkciu
 
 1. **Infraštruktúra**: in-memory → Temporal (durable execution), EventStoreDB, Kafka
-2. **Integrácie**: len Claude API → multi-model (OpenAI, Google, Mistral, Ollama)
+2. ~~**Integrácie**: len Claude API → multi-model~~ ✅ (OpenAI, Ollama + ModelRouter)
 3. **LangGraph middleware**: `pip install kovrin-safety` wrapper
-4. **CLI**: `kovrin run`, `kovrin verify`, `kovrin audit`
+4. ~~**CLI**: `kovrin run`, `kovrin verify`, `kovrin audit`~~ ✅
 5. **Certifikácie**: SOC 2, HIPAA, FedRAMP
 6. **OpenTelemetry**: export traces do štandardných observability nástrojov
 7. **Komunita**: 0 stars, 0 externých používateľov — potrebná launch stratégia
-8. **GitHub Actions CI**: pytest + mypy + ruff pipeline
+8. ~~**GitHub Actions CI**: pytest + mypy + ruff pipeline~~ ✅ (+ coverage + pip-audit)
 9. **Docs site**: docs.kovrin.dev (Fumadocs alebo podobné)
+10. **Refactor hardcoded model strings**: 10 miest s `claude-sonnet-4-20250514` → provider abstrakcia
 
 ---
 
