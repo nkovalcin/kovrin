@@ -465,6 +465,44 @@ curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
 - **Commit format** (Conventional Commits): `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`
 - **PR veľkosť**: Max 400 riadkov (bez testov). Väčšie zmeny rozdeliť.
 - **Nikdy nekomitovať**: `.env`, `kovrin.db`, `__pycache__`, `.pyc`, API kľúče
+- **Dual-repo workflow**: Zmeny často zasahujú **oba** repozitáre (kovrin + kovrin-web). Vždy commitni a pushni oba ak boli zmenené. Poradie: kovrin (backend) prvý, potom kovrin-web (frontend).
+
+---
+
+## CI/CD Pipeline
+
+### kovrin (Python backend) — `.github/workflows/ci.yml`
+
+| Job | Čo robí | Blocking? |
+|-----|---------|-----------|
+| **test** | `pytest` (Python 3.12 + 3.13), 70% coverage requirement, Codecov upload | ✅ Áno |
+| **typecheck** | `mypy` s `--disallow-untyped-defs` (excludes superwork/examples) | ⚠️ Non-blocking (warning) |
+| **security** | `pip-audit` dependency vulnerability scan | ⚠️ Non-blocking (warning) |
+
+**Trigger:** push/PR na `main`
+**Skipped tests:** `test_api.py`, `test_superwork_api.py` (vyžadujú bežiaci server)
+
+### kovrin-web (Next.js frontend) — `.github/workflows/ci.yml`
+
+| Job | Čo robí | Blocking? |
+|-----|---------|-----------|
+| **lint** | ESLint (`npm run lint`) | ✅ Áno |
+| **typecheck** | TypeScript (`tsc --noEmit`) | ✅ Áno |
+| **build** | Next.js production build (`npm run build`), závisí na lint + typecheck | ✅ Áno |
+| **security** | `npm audit --audit-level=high` | ⚠️ Non-blocking (warning) |
+
+**Trigger:** push/PR na `main`
+
+### Railway Deployment (Production)
+
+| Služba | Builder | Health check | Auto-deploy |
+|--------|---------|-------------|-------------|
+| **kovrin-api** | Dockerfile (Python 3.12-slim + uvicorn) | `/api/health` | ✅ push na `main` |
+| **kovrin-web** | Nixpacks (Node 20 + Next.js) | `/` | ✅ push na `main` |
+
+**Flow:** `git push origin main` → GitHub Actions CI → (ak pass) → Railway auto-build → deploy
+
+> **Poznámka:** Railway deploy nie je gated za CI — spustí sa paralelne. Pre gated deploy treba Railway GitHub integration s required checks.
 
 ---
 
@@ -486,7 +524,8 @@ curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
 | Pre-existing API tests (7) | 🟡 Nízka | `test_api.py` testy zlyhávajú bez bežiaceho servera + ANTHROPIC_API_KEY. Skip cez `--ignore`. |
 | kovrin-web deploy na Railway | 🔴 Vysoká | Chýba `DATABASE_URL` (pg.Pool pri module load), `KOVRIN_API_INTERNAL_URL` (proxy padá na localhost). Treba Railway Postgres + env vars. |
 | `dashboard/` v kovrin repo je zastaraný | 🟡 Stredná | Starý Vite+React prototyp. Produkčný frontend je v `kovrin-web/` repo. Zvážiť odstránenie alebo archív. |
-| kovrin-web `cacheDirectories = []` | 🟢 Nízka | Nixpacks cache disabled → pomalé buildy. Pridať `["node_modules", ".next/cache"]`. |
+| kovrin-web `cacheDirectories = []` | ✅ Vyriešené | Nixpacks cache enabled: `["node_modules", ".next/cache"]`. |
+| kovrin-web GitHub Actions CI | ✅ Vyriešené | ESLint + TypeScript + Next.js build + npm audit. |
 
 ---
 
