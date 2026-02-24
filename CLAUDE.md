@@ -524,7 +524,7 @@ curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
 | Pre-existing API tests (7) | 🟡 Nízka | `test_api.py` testy zlyhávajú bez bežiaceho servera + ANTHROPIC_API_KEY. Skip cez `--ignore`. |
 | kovrin-web deploy na Railway | 🔴 Vysoká | Chýba `DATABASE_URL` (pg.Pool pri module load), `KOVRIN_API_INTERNAL_URL` (proxy padá na localhost). Treba Railway Postgres + env vars. |
 | `dashboard/` v kovrin repo je zastaraný | 🟡 Stredná | Starý Vite+React prototyp. Produkčný frontend je v `kovrin-web/` repo. Zvážiť odstránenie alebo archív. |
-| kovrin-web `cacheDirectories = []` | ✅ Vyriešené | Nixpacks cache enabled: `["node_modules", ".next/cache"]`. |
+| kovrin-web `cacheDirectories` | ✅ Vyriešené | `[".next/cache"]` only. **POZOR:** `node_modules` NESMIE byť v cacheDirectories — Nixpacks ho mountne ako prázdny Docker cache volume cez nainštalované balíčky → `next: not found`. npm ci má vlastný cache cez `/root/.npm`. |
 | kovrin-web GitHub Actions CI | ✅ Vyriešené | ESLint + TypeScript + Next.js build + npm audit. |
 
 ---
