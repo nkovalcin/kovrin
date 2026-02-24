@@ -19,7 +19,7 @@ class TestCLIBasic:
             timeout=10,
         )
         # argparse fallback uses --version
-        assert "2.0.0-alpha" in result.stdout or "2.0.0-alpha" in result.stderr
+        assert "2.0.0a1" in result.stdout or "2.0.0a1" in result.stderr
 
     def test_no_command_shows_help(self):
         """CLI with no args should show help."""
@@ -41,7 +41,7 @@ class TestCLIBasic:
             timeout=10,
         )
         assert "Kovrin Framework Status" in result.stdout
-        assert "2.0.0-alpha" in result.stdout
+        assert "2.0.0a1" in result.stdout
         assert "Dependencies" in result.stdout
 
     def test_verify_command(self):

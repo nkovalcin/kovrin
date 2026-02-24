@@ -345,7 +345,7 @@ TY len: schvaľuješ, zasahuješ, sleduješ progress cez "sklo"
 - [x] KOVRIN core framework (480 testov, TLA+, constitutional safety)
 - [x] CLAUDE.md, README, ARCHITECTURE.md
 - [ ] GitHub release + PyPI `pip install kovrin`
-- [ ] Landing page kovrin.ai (jednoduchá, len hero + waitlist)
+- [ ] Landing page kovrin.dev (jednoduchá, len hero + waitlist)
 
 ### Fáza 1 — SuperWork MVP (2-4 týždne)
 - [ ] Session Watcher (Python daemon, watchdog knižnica)
@@ -369,7 +369,7 @@ TY len: schvaľuješ, zasahuješ, sleduješ progress cez "sklo"
 - [ ] OpenTelemetry export
 
 ### Fáza 4 — SaaS (3-6 mesiacov)
-- [ ] app.kovrin.ai (hosted dashboard)
+- [ ] app.kovrin.dev (hosted dashboard)
 - [ ] Team features (viac supervisorov, role)
 - [ ] Compliance exports (SOC 2, HIPAA ready)
 - [ ] Marketplace taskov / workflow šablóny

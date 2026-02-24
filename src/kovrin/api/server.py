@@ -19,7 +19,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from kovrin import Kovrin
+from kovrin import Kovrin, __version__
 from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
 from kovrin.core.models import (
     ApprovalRequest,
@@ -52,7 +52,7 @@ class StatusResponse(BaseModel):
     running_pipelines: int
     completed_pipelines: int
     pending_approvals: int = 0
-    version: str = "2.0.0-alpha"
+    version: str = __version__
 
 
 class ApproveRequest(BaseModel):
@@ -331,7 +331,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Kovrin API",
     description="Safety-first intent-based AI orchestration",
-    version="2.0.0-alpha",
+    version=__version__,
     lifespan=lifespan,
 )
 
@@ -375,7 +375,7 @@ async def health_check() -> dict:
     """Lightweight health check — always responds, even in degraded mode."""
     return {
         "status": "ok" if manager is not None else "degraded",
-        "version": "2.0.0-alpha",
+        "version": __version__,
         "init_error": _init_error,
     }
 

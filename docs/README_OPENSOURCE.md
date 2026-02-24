@@ -8,10 +8,9 @@
 
 <p align="center">
   <a href="https://pypi.org/project/kovrin/"><img src="https://img.shields.io/pypi/v/kovrin?style=flat-square&color=10B981" alt="PyPI" /></a>
-  <a href="https://github.com/digital-specialists/kovrin/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/digital-specialists/kovrin"><img src="https://img.shields.io/github/stars/digital-specialists/kovrin?style=flat-square&color=10B981" alt="Stars" /></a>
-  <a href="https://discord.gg/kovrin"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square" alt="Discord" /></a>
-  <a href="https://docs.kovrin.dev"><img src="https://img.shields.io/badge/docs-kovrin.dev-3B82F6?style=flat-square" alt="Docs" /></a>
+  <a href="https://github.com/nkovalcin/kovrin/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" /></a>
+  <a href="https://github.com/nkovalcin/kovrin"><img src="https://img.shields.io/github/stars/nkovalcin/kovrin?style=flat-square&color=10B981" alt="Stars" /></a>
+  <a href="https://kovrin.dev/docs/getting-started"><img src="https://img.shields.io/badge/docs-kovrin.dev-3B82F6?style=flat-square" alt="Docs" /></a>
 </p>
 
 ---
@@ -28,9 +27,9 @@ Most frameworks treat safety as an afterthought: prompt-level instructions that 
 | Constitutional constraints | ✅ (5 axioms, SHA-256 integrity) | ❌ | ❌ | Partial |
 | Cryptographic audit trail | ✅ (Merkle hash chain) | ❌ | ❌ | ❌ |
 | Risk-based routing | ✅ (4×3 matrix + overrides) | ❌ | ❌ | ❌ |
-| Human-in-the-loop | ✅ (configurable, SLA timers) | Manual | ❌ | ❌ |
+| Human-in-the-loop | ✅ (configurable per risk level) | Manual | ❌ | ❌ |
 | Multi-agent coordination | ✅ (DCT tokens, scope narrowing) | ✅ | ✅ | ❌ |
-| EU AI Act pre-mapped | ✅ (Art. 12, 14) | ❌ | ❌ | ❌ |
+| EU AI Act pre-mapped | ✅ (Art. 9, 12, 14, 15) | ❌ | ❌ | ❌ |
 
 ## Quick Start
 
@@ -41,21 +40,30 @@ pip install kovrin
 ```python
 from kovrin import Kovrin
 
-engine = Kovrin(api_key="sk-ant-...")
+engine = Kovrin(tools=True)
 
-result = engine.run("Analyze costs and suggest savings")
+result = engine.run_sync(
+    intent="Search for Python 3.13 features and summarize them",
+    constraints=["Be concise", "Focus on developer-relevant features"],
+)
 
-# That's it. Behind the scenes, KOVRIN:
+# Behind the scenes, KOVRIN:
 # 1. Parsed intent into structured subtasks (IntentV2)
 # 2. Ran every subtask through 3 critics (safety, feasibility, policy)
 # 3. Verified constitutional constraints (5 axioms, SHA-256)
 # 4. Built execution DAG with dependency resolution
 # 5. Routed each task through risk matrix (AUTO/SANDBOX/HUMAN)
-# 6. Executed with concurrent semaphore (max 5)
+# 6. Executed with safety-gated tools (web search, code analysis, etc.)
 # 7. Logged every event to Merkle hash chain
 
 print(result.output)
-print(result.traces)  # Full audit trail, verifiable
+print(result.traces)  # Full audit trail
+```
+
+Or async:
+
+```python
+result = await engine.run("Analyze costs and suggest savings")
 ```
 
 ## Architecture
@@ -107,73 +115,77 @@ User: "Analyze costs and suggest savings"
 
 KOVRIN enforces 5 axioms that **cannot be bypassed**. They are verified with SHA-256 integrity checks — if the axiom definitions are tampered with, the engine refuses to start.
 
-```python
-from kovrin import Kovrin
+| Axiom | Guarantee |
+|-------|-----------|
+| Human Agency | No action removes human override ability |
+| Harm Floor | Expected harm never exceeds threshold |
+| Transparency | All decisions traceable to intent |
+| Reversibility | Prefer reversible over irreversible |
+| Scope Limit | Never exceed authorized boundary |
 
-engine = Kovrin(api_key="sk-ant-...")
-
-# Add custom constraints
-engine.constitution.add("Never execute financial transactions over $10,000 without human approval")
-engine.constitution.add("Never access production databases in exploration mode")
-```
+All-or-nothing: one axiom fails = entire task rejected. No exceptions.
 
 ### Risk-Based Routing
 
 Every task is scored for risk and routed through a configurable matrix:
 
 ```python
-from kovrin import Kovrin, AutonomyProfile
+from kovrin import Kovrin, AutonomySettings
+from kovrin.core.models import AutonomyProfile
 
 engine = Kovrin(
-    api_key="sk-ant-...",
-    autonomy=AutonomyProfile.GUARDED,  # FREE | GUARDED | NONE
+    autonomy_settings=AutonomySettings(profile=AutonomyProfile.CAUTIOUS),
 )
 
-# HIGH risk + GUARDED profile → HUMAN_APPROVAL required
-# The engine blocks and waits for approval via API or dashboard
+# CRITICAL risk = always HUMAN_APPROVAL (hardcoded, non-overridable)
 ```
 
 ### Merkle Audit Trail
 
-Every event is cryptographically chained. You can verify the entire execution history was not tampered with:
+Every event is cryptographically chained. Tamper-evident, append-only:
 
 ```python
-result = engine.run("Process quarterly report")
+from kovrin import ImmutableTraceLog
 
-# Verify integrity of the entire chain
-assert result.traces.verify_integrity()  # True if no tampering
+log = ImmutableTraceLog()
+# ... after execution ...
+assert log.verify_integrity()  # True if no tampering
+```
 
-# Export for compliance
-result.traces.export("audit_q1_2026.json")
+### Safety-Gated Tools
+
+8 built-in tools with per-tool risk profiles, sandboxed execution, and Merkle-audited calls:
+
+```python
+engine = Kovrin(tools=True)
+
+# Built-in: web_search, calculator, datetime, json_transform,
+#           code_analysis, http_request, file_read, file_write
+# Each tool has risk_level, requires_sandbox, allowed_domains
 ```
 
 ### Multi-Agent Coordination
 
-KOVRIN uses **Delegation Capability Tokens (DCT)** for secure agent coordination:
+Secure agent coordination with **Delegation Capability Tokens (DCT)**:
 
 ```python
-from kovrin import Kovrin
-
-engine = Kovrin(api_key="sk-ant-...", agents=True)
+engine = Kovrin(agents=True, enable_tokens=True)
 
 # Agents receive scoped tokens:
 # - Allowed risk levels (e.g., LOW only)
-# - Max tasks, max depth
-# - Time-to-live
+# - Max tasks, max depth, time-to-live
 # - Parent token chain (hierarchical delegation)
 # Scope can only NARROW, never widen.
 ```
 
 ### Watchdog
 
-Independent safety monitor that subscribes to the trace log:
+Independent safety monitor with temporal rules and graduated containment:
 
 ```python
-from kovrin import Kovrin
+engine = Kovrin(watchdog=True)
 
-engine = Kovrin(api_key="sk-ant-...", watchdog=True)
-
-# Watchdog monitors for:
+# Monitors for:
 # - Execution after rejection → KILL
 # - >50% failure rate → PAUSE
 # - Unexpected event sequences → WARN
@@ -184,18 +196,19 @@ engine = Kovrin(api_key="sk-ant-...", watchdog=True)
 ## Configuration
 
 ```python
-from kovrin import Kovrin, AutonomyProfile
+from kovrin import Kovrin, AutonomySettings
+from kovrin.core.models import AutonomyProfile
 
 engine = Kovrin(
-    api_key="sk-ant-...",
-    model="claude-sonnet-4-20250514",    # Default model
-    autonomy=AutonomyProfile.GUARDED,     # FREE | GUARDED | NONE
-    max_concurrent=5,                     # Semaphore limit
-    approval_timeout=300,                 # Seconds before timeout
-    watchdog=True,                        # Enable watchdog
-    agents=True,                          # Enable multi-agent
-    explore=False,                        # MCTS exploration
-    prm=False,                            # Process Reward Model
+    api_key="sk-ant-...",             # Or set ANTHROPIC_API_KEY env var
+    max_concurrent=5,                 # Semaphore limit
+    watchdog=True,                    # Enable watchdog
+    agents=True,                      # Enable multi-agent
+    tools=True,                       # Enable safety-gated tools
+    explore=False,                    # MCTS exploration
+    enable_prm=False,                 # Process Reward Model
+    enable_tokens=True,               # Delegation Capability Tokens
+    autonomy_settings=AutonomySettings(profile=AutonomyProfile.CAUTIOUS),
 )
 ```
 
@@ -205,24 +218,23 @@ KOVRIN maps directly to EU AI Act requirements:
 
 | EU AI Act Article | KOVRIN Feature |
 |---|---|
+| Article 9 (Risk management) | Constitutional constraints + watchdog |
 | Article 12 (Record-keeping) | Merkle hash chain audit trail |
 | Article 14 (Human oversight) | Risk-based routing + human-in-the-loop |
 | Article 15 (Accuracy & robustness) | Formal verification (TLA+) + critic pipeline |
-| Article 9 (Risk management) | Constitutional constraints + watchdog |
 
 ## Documentation
 
-- **[Getting Started](https://docs.kovrin.dev/getting-started)** — 5-minute quickstart
-- **[Architecture](https://docs.kovrin.dev/concepts/architecture)** — Deep dive into internals
-- **[API Reference](https://docs.kovrin.dev/api)** — Full API documentation
-- **[Compliance Guide](https://docs.kovrin.dev/guides/compliance)** — EU AI Act mapping
+- **[Getting Started](https://kovrin.dev/docs/getting-started)** — 5-minute quickstart
+- **[Architecture](https://kovrin.dev/docs/architecture)** — Deep dive into internals
+- **[API Reference](https://kovrin.dev/docs/api-reference)** — Full API documentation
 
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
-git clone https://github.com/digital-specialists/kovrin.git
+git clone https://github.com/nkovalcin/kovrin.git
 cd kovrin
 pip install -e ".[dev]"
 pytest
@@ -234,8 +246,13 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- **Website**: [kovrin.ai](https://kovrin.ai)
-- **Documentation**: [docs.kovrin.dev](https://docs.kovrin.dev)
-- **GitHub**: [github.com/digital-specialists/kovrin](https://github.com/digital-specialists/kovrin)
-- **Discord**: [discord.gg/kovrin](https://discord.gg/kovrin)
+- **Website**: [kovrin.dev](https://kovrin.dev)
+- **Documentation**: [kovrin.dev/docs](https://kovrin.dev/docs/getting-started)
+- **GitHub**: [github.com/nkovalcin/kovrin](https://github.com/nkovalcin/kovrin)
 - **PyPI**: [pypi.org/project/kovrin](https://pypi.org/project/kovrin)
+
+---
+
+Built by [Norbert Kovalcin](https://nkovalcin.com) — DIGITAL SPECIALISTS s.r.o.
+
+*"The question isn't whether we'll build AGI. The question is whether we'll build the safety infrastructure first."*

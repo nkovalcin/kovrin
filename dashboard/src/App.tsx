@@ -168,7 +168,7 @@ export default function App() {
       <nav className="w-48 bg-[#111113] border-r border-[#27272A] p-4 flex flex-col">
         <div className="mb-4">
           <h1 className="text-xl font-bold text-emerald-400 tracking-tight">KOVRIN</h1>
-          <p className="text-[10px] text-gray-500 mt-0.5 font-mono">v{status?.version || '2.0.0-alpha'}</p>
+          <p className="text-[10px] text-gray-500 mt-0.5 font-mono">v{status?.version || '2.0.0a1'}</p>
         </div>
 
         <div className="mb-4">

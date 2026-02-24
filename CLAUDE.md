@@ -12,7 +12,7 @@
 
 > **Formerly "LATTICE"** — Language for Autonomous Thinking, Transformation, and Intelligent Coordination at Emergent Scale. Premenovaný na **Kovrin** vo februári 2026.
 
-**Verzia frameworku:** `2.0.0-alpha`
+**Verzia frameworku:** `2.0.0a1`
 **Python:** `3.12+`
 **Stav:** Alpha — core + tools + providers + CLI implementované, **production-verified na Railway**
 **Licencia:** MIT
@@ -511,7 +511,7 @@ curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
 | Problém | Priorita | Poznámka |
 |---------|----------|---------|
 | `dashboard/src/types/kovrin.ts` | ✅ Vyriešené | Regenerované cez SchemaExporter (29 models, 13 enums). Udržiavať cez `--typescript` exporter. |
-| `docs/CLAUDE_OPENSOURCE.md` je TARGET súbor | 🟡 Stredná | Obsahuje idealizovanú štruktúru, nie súčasný stav. Po cleanup merge do tohto CLAUDE.md. |
+| `docs/CLAUDE_OPENSOURCE.md` | ✅ Vyriešené | Zmazané — navrhovala neexistujúcu štruktúru, plne superseded root CLAUDE.md. |
 | SQLite v produkcii | 🟡 Stredná | Pre produkciu → Temporal/EventStoreDB/Kafka |
 | Multi-model | ✅ Vyriešené | ClaudeProvider, OpenAIProvider, OllamaProvider + ModelRouter |
 | CLI | ✅ Vyriešené | `kovrin run`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
@@ -522,7 +522,7 @@ curl -X POST https://kovrin-api-production-*.up.railway.app/api/pipeline \
 | FeasibilityCritic false rejections | ✅ Vyriešené | Improved prompt s detailed tool capabilities, explicit eval rules. Verified: 4/4 tasks PASS. |
 | Hardcoded model strings | 🟡 Stredná | ~10 miest s `claude-sonnet-4-20250514` → provider abstrakcia. Nefunkčný bug, len tech debt. |
 | Pre-existing API tests (7) | 🟡 Nízka | `test_api.py` testy zlyhávajú bez bežiaceho servera + ANTHROPIC_API_KEY. Skip cez `--ignore`. |
-| kovrin-web deploy na Railway | 🔴 Vysoká | Chýba `DATABASE_URL` (pg.Pool pri module load), `KOVRIN_API_INTERNAL_URL` (proxy padá na localhost). Treba Railway Postgres + env vars. |
+| kovrin-web deploy na Railway | ✅ Vyriešené | Waitlist má lazy pool initialization — graceful degradation bez `DATABASE_URL`. Pre plný waitlist treba Railway Postgres. `KOVRIN_API_INTERNAL_URL` treba pre proxy routes. |
 | `dashboard/` v kovrin repo je zastaraný | 🟡 Stredná | Starý Vite+React prototyp. Produkčný frontend je v `kovrin-web/` repo. Zvážiť odstránenie alebo archív. |
 | kovrin-web `cacheDirectories` | ✅ Vyriešené | `[".next/cache"]` only. **POZOR:** `node_modules` NESMIE byť v cacheDirectories — Nixpacks ho mountne ako prázdny Docker cache volume cez nainštalované balíčky → `next: not found`. npm ci má vlastný cache cez `/root/.npm`. |
 | kovrin-web GitHub Actions CI | ✅ Vyriešené | ESLint + TypeScript + Next.js build + npm audit. |
@@ -652,11 +652,20 @@ superwork = [
 
 ## Čo chýba pre produkciu
 
-**Fáza 0 — Open Source Launch**
-- [ ] GitHub release + `pip install kovrin` na PyPI
+**Fáza 0 — Open Source Launch** ← AKTUÁLNY FOKUS
 - [x] Landing page kovrin.dev (hero + waitlist + features + pricing) — `kovrin-web` repo
 - [x] Doména `kovrin.dev` zakúpená
-- [ ] Opraviť kovrin-web deploy na Railway (chýba DATABASE_URL, KOVRIN_API_INTERNAL_URL)
+- [x] Opraviť kovrin-web deploy na Railway (waitlist graceful degradation bez DATABASE_URL)
+- [x] Docs cleanup — 100% presné API ukážky, správne domény (kovrin.dev), aktuálne test counts
+- [x] PEP 440 verzia (`2.0.0a1`) pre PyPI kompatibilitu
+- [x] CHANGELOG.md (Keep a Changelog formát)
+- [ ] `pip install kovrin` na PyPI (build + TestPyPI + publish)
+- [ ] GitHub Release v2.0.0a1
+- [ ] GitHub repo public
+- [ ] DNS verifikácia (kovrin.dev, api.kovrin.dev)
+
+> **Stratégia:** Dashboard (app.kovrin.dev) odkladáme na neskôr — fokus je open-source framework + docs + marketing site.
+> **FeasibilityCritic:** V budúcnosti tuning — aktuálne funguje (4/4 PASS), ale pri zložitejších promptoch môže rejected rate byť vysoký. Treba kalibrovať prahové hodnoty a tool capability descriptions.
 
 **Fáza 1 — SuperWork MVP (2-4 týždne)**
 - [x] Session Watcher daemon — `src/kovrin/superwork/session_watcher.py`

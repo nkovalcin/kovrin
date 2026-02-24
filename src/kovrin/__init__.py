@@ -42,7 +42,7 @@ from kovrin.intent.schema import IntentV2
 from kovrin.safety.critics import CriticPipeline, FeasibilityCritic, PolicyCritic, SafetyCritic
 from kovrin.safety.watchdog import WatchdogAgent
 
-__version__ = "2.0.0-alpha"
+__version__ = "2.0.0a1"
 
 __all__ = [
     # Main API

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kovrin"
-version = "2.0.0-alpha"
+version = "2.0.0a1"
 description = "Safety-first intent-based AI orchestration framework with constitutional constraints, formal verification, and cryptographic audit trails"
 readme = "README.md"
 license = "MIT"
@@ -39,7 +39,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://kovrin.dev"
-Documentation = "https://kovrin.dev"
+Documentation = "https://kovrin.dev/docs/getting-started"
 Repository = "https://github.com/nkovalcin/kovrin"
 Issues = "https://github.com/nkovalcin/kovrin/issues"
 

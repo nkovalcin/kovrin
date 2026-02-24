@@ -36,8 +36,10 @@ def _click_cli() -> None:
     """Click-based CLI (requires pip install kovrin[cli])."""
     import click
 
+    from kovrin import __version__
+
     @click.group()
-    @click.version_option(version="2.0.0-alpha", prog_name="kovrin")
+    @click.version_option(version=__version__, prog_name="kovrin")
     def app() -> None:
         """Kovrin — Safety-First AI Agent Orchestration Framework"""
         pass
@@ -104,7 +106,9 @@ def _argparse_cli() -> None:
         prog="kovrin",
         description="Kovrin — Safety-First AI Agent Orchestration Framework",
     )
-    parser.add_argument("--version", action="version", version="kovrin 2.0.0-alpha")
+    from kovrin import __version__
+
+    parser.add_argument("--version", action="version", version=f"kovrin {__version__}")
     subparsers = parser.add_subparsers(dest="command")
 
     # run

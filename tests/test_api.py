@@ -23,7 +23,7 @@ class TestStatusEndpoint:
             data = response.json()
             assert "running_pipelines" in data
             assert "completed_pipelines" in data
-            assert data["version"] == "2.0.0-alpha"
+            assert data["version"] == "2.0.0a1"
 
 
 # ─── Traces Endpoint ─────────────────────────────────────────
@@ -181,4 +181,4 @@ class TestRequestModels:
             running_pipelines=2,
             completed_pipelines=5,
         )
-        assert sr.version == "2.0.0-alpha"
+        assert sr.version == "2.0.0a1"

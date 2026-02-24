@@ -232,15 +232,15 @@ src/kovrin/
 
 specs/            # TLA+ formal verification (8 modules)
 dashboard/        # React/TypeScript dashboard (12 components)
-tests/            # 734 tests (unit + adversarial + integration)
+tests/            # 741 tests (unit + adversarial + integration)
 ```
 
 ## Testing
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -v                       # All 734 tests
-pytest -m adversarial -v               # 41 adversarial attack tests
+pytest tests/ -v                       # All 741 tests
+pytest -m adversarial -v               # 42 adversarial attack tests
 pytest -m "not integration"            # Without API calls
 ```
 
@@ -261,7 +261,8 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- **Website**: [kovrin.ai](https://kovrin.ai)
+- **Website**: [kovrin.dev](https://kovrin.dev)
+- **Documentation**: [kovrin.dev/docs](https://kovrin.dev/docs/getting-started)
 - **GitHub**: [github.com/nkovalcin/kovrin](https://github.com/nkovalcin/kovrin)
 
 ---
