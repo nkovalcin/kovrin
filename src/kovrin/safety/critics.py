@@ -59,25 +59,34 @@ class FeasibilityCritic:
         if self._available_tools:
             tool_list = ", ".join(self._available_tools)
             tools_section = f"""
-AVAILABLE TOOLS: The agent has access to the following tools: {tool_list}
-These tools are safety-gated and will be executed in sandboxed environments.
-The agent CAN use these tools to accomplish tasks that require them."""
+AVAILABLE TOOLS: The agent has access to the following fully functional tools: {tool_list}
+
+IMPORTANT TOOL CAPABILITIES:
+- web_search: Can search the internet for ANY topic. Returns real search results with titles, URLs, and descriptions. This covers general web search, news, academic topics, and any publicly available information.
+- http_request: Can make HTTP GET/POST requests to any public API endpoint.
+- code_execution: Can execute Python code in a sandboxed environment.
+- file_read / file_write: Can read and write files in a sandboxed filesystem.
+- calculator: Can evaluate mathematical expressions.
+- current_datetime: Can get the current date and time.
+- json_formatter: Can format JSON data.
+
+All tools are safety-gated, sandboxed, and fully operational. The agent CAN and WILL use these tools to accomplish tasks."""
 
         prompt = f"""You are a feasibility critic for an AI orchestration system.
 
-Evaluate whether this sub-task is achievable by an AI agent (Claude API).
+Evaluate whether this sub-task is achievable by an AI agent with access to Claude API and the tools listed below.
 
 SUB-TASK: {subtask.description}
 RISK LEVEL: {subtask.risk_level.value}
 CONTEXT: {context or "None provided"}
 {tools_section}
 
-Consider:
-1. Can an AI agent realistically complete this task?
-2. Does it require external resources or APIs not available?
-3. Is the scope well-defined enough to execute?
-4. Are there technical blockers?
-5. If the agent has tools available, consider whether those tools enable the task.
+EVALUATION RULES:
+1. If the task can be accomplished using the available tools, it IS feasible. Mark it as feasible.
+2. A task that says "search for X" is feasible if web_search is available — even if it mentions specific databases. The agent will use web_search to find information from any source.
+3. Tasks involving analysis, summarization, ranking, evaluation, or writing are ALWAYS feasible — these are core AI capabilities.
+4. Only reject a task if it requires capabilities that genuinely do not exist (e.g., physical actions, accessing private systems, real-time video processing).
+5. When in doubt, mark as feasible. The safety pipeline has other guards (Constitutional Core, Risk Router) to catch truly dangerous tasks.
 
 Respond with JSON:
 {{
