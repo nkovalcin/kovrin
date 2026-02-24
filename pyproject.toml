@@ -50,12 +50,19 @@ api = [
     "websockets>=14.0",
     "psycopg[binary]>=3.2",
 ]
+openai = [
+    "openai>=1.0",
+]
 superwork = [
     "watchdog>=4.0",
     "chromadb>=0.5",
     "sentence-transformers>=3.0",
     "rich>=13.0",
     "click>=8.0",
+]
+cli = [
+    "click>=8.0",
+    "rich>=13.0",
 ]
 dev = [
     "pytest>=8.0",
@@ -64,12 +71,14 @@ dev = [
     "httpx>=0.28",
     "mypy>=1.10",
     "ruff>=0.5",
+    "pytest-cov>=5.0",
 ]
 all = [
-    "kovrin[api,superwork]",
+    "kovrin[api,openai,superwork,cli]",
 ]
 
 [project.scripts]
+kovrin = "kovrin.cli:cli"
 kovrin-superwork = "kovrin.superwork.cli:main"
 
 [tool.hatch.build.targets.wheel]
