@@ -95,9 +95,10 @@ class PipelineManager:
         # Load persisted autonomy settings
         self._autonomy_settings = self._repo.get_autonomy_settings()
 
-        # Create Kovrin with approval callback and autonomy settings
+        # Create Kovrin with approval callback, autonomy settings, and tools
         self._kovrin = Kovrin(
             watchdog=False,
+            tools=True,
             approval_callback=self._handle_approval,
             autonomy_settings=self._autonomy_settings,
         )
