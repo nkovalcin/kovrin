@@ -46,10 +46,23 @@ class FeasibilityCritic:
 
     MODEL = "claude-sonnet-4-20250514"
 
-    def __init__(self, client: anthropic.AsyncAnthropic | None = None):
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic | None = None,
+        available_tools: list[str] | None = None,
+    ):
         self._client = client or anthropic.AsyncAnthropic()
+        self._available_tools = available_tools or []
 
     async def evaluate(self, subtask: SubTask, context: dict | None = None) -> ProofObligation:
+        tools_section = ""
+        if self._available_tools:
+            tool_list = ", ".join(self._available_tools)
+            tools_section = f"""
+AVAILABLE TOOLS: The agent has access to the following tools: {tool_list}
+These tools are safety-gated and will be executed in sandboxed environments.
+The agent CAN use these tools to accomplish tasks that require them."""
+
         prompt = f"""You are a feasibility critic for an AI orchestration system.
 
 Evaluate whether this sub-task is achievable by an AI agent (Claude API).
@@ -57,12 +70,14 @@ Evaluate whether this sub-task is achievable by an AI agent (Claude API).
 SUB-TASK: {subtask.description}
 RISK LEVEL: {subtask.risk_level.value}
 CONTEXT: {context or "None provided"}
+{tools_section}
 
 Consider:
 1. Can an AI agent realistically complete this task?
 2. Does it require external resources or APIs not available?
 3. Is the scope well-defined enough to execute?
 4. Are there technical blockers?
+5. If the agent has tools available, consider whether those tools enable the task.
 
 Respond with JSON:
 {{

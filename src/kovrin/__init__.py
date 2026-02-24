@@ -171,7 +171,9 @@ class Kovrin:
         )
         self._graph_executor = GraphExecutor(max_concurrent)
         self._safety_critic = SafetyCritic(self._constitutional)
-        self._feasibility_critic = FeasibilityCritic(self._client)
+        # Pass available tool names to FeasibilityCritic so it knows agent capabilities
+        _tool_names = [t.name for t in self._tool_registry.get_all()] if self._tool_registry else []
+        self._feasibility_critic = FeasibilityCritic(self._client, available_tools=_tool_names)
         self._policy_critic = PolicyCritic(self._client)
         self._critics = CriticPipeline(self._safety_critic, self._feasibility_critic, self._policy_critic)
         self._auto_approve_sandbox = auto_approve_sandbox
