@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["python312"]
+nixPkgs = ["python312", "python312Packages.pip"]
 
 [phases.install]
-cmds = ["pip install -e '.[api,superwork]'"]
+cmds = ["python3 -m venv /opt/venv && /opt/venv/bin/pip install -e '.[api,superwork]'"]
 
 [start]
-cmd = "uvicorn kovrin.api.server:app --host 0.0.0.0 --port ${PORT:-8000}"
+cmd = "/opt/venv/bin/uvicorn kovrin.api.server:app --host 0.0.0.0 --port ${PORT:-8000}"

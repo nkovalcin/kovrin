@@ -1,1 +1,1 @@
-web: uvicorn kovrin.api.server:app --host 0.0.0.0 --port ${PORT:-8000}
+web: /opt/venv/bin/uvicorn kovrin.api.server:app --host 0.0.0.0 --port ${PORT:-8000}
