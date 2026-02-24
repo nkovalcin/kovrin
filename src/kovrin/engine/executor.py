@@ -9,6 +9,11 @@ different routing decisions:
 - AUTO_EXECUTE: execute immediately
 - SANDBOX_REVIEW: execute with enhanced logging (MVP)
 - HUMAN_APPROVAL: request approval before execution
+
+When tools are enabled, the executor supports Claude's tool_use
+feature with safety-gated execution through SafeToolRouter.
+Every tool call is validated against the safety pipeline before
+execution.
 """
 
 from __future__ import annotations
@@ -30,10 +35,19 @@ from kovrin.engine.risk_router import RiskRouter
 
 if TYPE_CHECKING:
     from kovrin.engine.prm import ProcessRewardModel
+    from kovrin.tools.registry import ToolRegistry
+    from kovrin.tools.router import SafeToolRouter
+
+MAX_TOOL_ROUNDS = 10  # Max tool_use round-trips per execution
 
 
 class TaskExecutor:
-    """Executes sub-tasks via Claude API with risk-aware routing."""
+    """Executes sub-tasks via Claude API with risk-aware routing.
+
+    When tool_registry and tool_router are provided, agents can
+    use tools (code execution, web search, file ops, etc.) with
+    every tool call validated through the Kovrin safety pipeline.
+    """
 
     MODEL = "claude-sonnet-4-20250514"
 
@@ -44,12 +58,16 @@ class TaskExecutor:
         approval_callback: Callable[[ApprovalRequest], "asyncio.Future[bool]"] | None = None,
         autonomy_settings: AutonomySettings | None = None,
         prm: ProcessRewardModel | None = None,
+        tool_registry: ToolRegistry | None = None,
+        tool_router: SafeToolRouter | None = None,
     ):
         self._client = client or anthropic.AsyncAnthropic()
         self._router = risk_router or RiskRouter()
         self._approval_callback = approval_callback
         self._autonomy_settings = autonomy_settings
         self._prm = prm
+        self._tool_registry = tool_registry
+        self._tool_router = tool_router
 
     def update_autonomy_settings(self, settings: AutonomySettings | None) -> None:
         """Update autonomy settings at runtime."""
@@ -123,13 +141,100 @@ If it requires generation, be creative yet precise."""
             risk_level=subtask.risk_level,
         ))
 
-        response = await self._client.messages.create(
-            model=self.MODEL,
-            max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        # Build API call kwargs
+        messages = [{"role": "user", "content": prompt}]
+        api_kwargs: dict = {
+            "model": self.MODEL,
+            "max_tokens": 4096,
+            "messages": messages,
+        }
 
-        result = response.content[0].text
+        # Add tools if registry is available
+        if self._tool_registry:
+            tool_schemas = self._tool_registry.get_schemas_for_task(subtask)
+            if tool_schemas:
+                api_kwargs["tools"] = tool_schemas
+
+        response = await self._client.messages.create(**api_kwargs)
+
+        # Tool use loop: handle tool_use responses with safety-gated execution
+        rounds = 0
+        while (
+            response.stop_reason == "tool_use"
+            and self._tool_router
+            and self._tool_registry
+            and rounds < MAX_TOOL_ROUNDS
+        ):
+            rounds += 1
+
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    from kovrin.tools.models import ToolCallRequest
+
+                    request = ToolCallRequest(
+                        tool_name=block.name,
+                        tool_input=block.input,
+                        tool_use_id=block.id,
+                        task_id=subtask.id,
+                        intent_id=subtask.parent_intent_id or "",
+                    )
+
+                    # Route through safety pipeline
+                    decision = await self._tool_router.evaluate(request)
+
+                    if decision.allowed:
+                        tool_result = await self._tool_router.execute_if_allowed(request, decision)
+                    else:
+                        from kovrin.agents.tools import ToolResult
+                        tool_result = ToolResult(
+                            tool_use_id=block.id,
+                            content=f"[BLOCKED BY SAFETY] {decision.reason}",
+                            is_error=True,
+                        )
+
+                    tool_results.append(tool_result)
+
+                    traces.append(Trace(
+                        intent_id=subtask.parent_intent_id or "",
+                        task_id=subtask.id,
+                        event_type="TOOL_CALL",
+                        description=f"Tool '{block.name}' → {decision.action.value}",
+                        details={
+                            "tool": block.name,
+                            "allowed": decision.allowed,
+                            "action": decision.action.value,
+                            "risk_level": decision.risk_level.value,
+                            "result_preview": tool_result.content[:200],
+                            "is_error": tool_result.is_error,
+                        },
+                        risk_level=decision.risk_level,
+                    ))
+
+            # Add assistant response + tool results to messages
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tr.tool_use_id,
+                        "content": tr.content,
+                        "is_error": tr.is_error,
+                    }
+                    for tr in tool_results
+                ],
+            })
+
+            api_kwargs["messages"] = messages
+            response = await self._client.messages.create(**api_kwargs)
+
+        # Extract final text result
+        result = ""
+        for block in response.content:
+            if hasattr(block, "text"):
+                result += block.text
+
         subtask.status = TaskStatus.COMPLETED
         subtask.output = result
 
@@ -138,7 +243,7 @@ If it requires generation, be creative yet precise."""
             task_id=subtask.id,
             event_type="EXECUTION_COMPLETE",
             description=f"Completed: {subtask.description[:60]}",
-            details={"output_length": len(result)},
+            details={"output_length": len(result), "tool_rounds": rounds},
             risk_level=subtask.risk_level,
         ))
 

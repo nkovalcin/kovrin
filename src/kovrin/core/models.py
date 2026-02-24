@@ -71,6 +71,16 @@ class AgentRole(str, Enum):
     SPECIALIST = "SPECIALIST"
 
 
+class ToolCategory(str, Enum):
+    """Classification of tool types for safety routing and DCT scope control."""
+    READ_ONLY = "READ_ONLY"
+    COMPUTATION = "COMPUTATION"
+    NETWORK = "NETWORK"
+    FILE_SYSTEM = "FILE_SYSTEM"
+    CODE_EXECUTION = "CODE_EXECUTION"
+    EXTERNAL_API = "EXTERNAL_API"
+
+
 # ─── Proof Obligations ──────────────────────────────────────
 
 class ProofObligation(BaseModel):
@@ -363,8 +373,10 @@ class DelegationScope(BaseModel):
     allowed_risk_levels: list[RiskLevel] = Field(default_factory=lambda: [RiskLevel.LOW])
     allowed_actions: list[RoutingAction] = Field(default_factory=lambda: [RoutingAction.AUTO_EXECUTE])
     allowed_capabilities: list[str] = Field(default_factory=list)
+    allowed_tool_categories: list[ToolCategory] = Field(default_factory=list)
     max_tasks: int = 10
     max_depth: int = 1
+    max_tool_calls: int = 50
 
 
 class DelegationToken(BaseModel):

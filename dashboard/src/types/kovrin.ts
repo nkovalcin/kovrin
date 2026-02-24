@@ -216,8 +216,10 @@ export interface DelegationScope {
   allowed_risk_levels?: RiskLevel[]
   allowed_actions?: RoutingAction[]
   allowed_capabilities?: string[]
+  allowed_tool_categories?: ToolCategory[]
   max_tasks?: number
   max_depth?: number
+  max_tool_calls?: number
 }
 
 export interface DelegationToken {

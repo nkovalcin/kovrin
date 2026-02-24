@@ -237,12 +237,12 @@ class TestWatchdogAgentDrift:
     def test_watchdog_without_drift(self):
         wd = WatchdogAgent()
         assert wd.drift_tracker is None
-        assert len(wd.rules) == 3  # DEFAULT_RULES only
+        assert len(wd.rules) == 6  # DEFAULT_RULES (3 original + 3 tool rules)
 
     def test_watchdog_with_drift(self):
         wd = WatchdogAgent(enable_agent_drift=True)
         assert wd.drift_tracker is not None
-        assert len(wd.rules) == 5  # 3 default + 2 drift
+        assert len(wd.rules) == 8  # 6 default + 2 drift
 
     def test_drift_tracker_accessible(self):
         wd = WatchdogAgent(enable_agent_drift=True)

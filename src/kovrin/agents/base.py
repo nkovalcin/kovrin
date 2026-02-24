@@ -9,10 +9,17 @@ Agents can optionally use tools (calculator, datetime, etc.)
 via Claude's tool_use feature.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import anthropic
 
 from kovrin.agents.tools import ToolExecutor, create_default_tools
 from kovrin.core.models import AgentInfo, AgentRole, SubTask, Trace
+
+if TYPE_CHECKING:
+    from kovrin.tools.router import SafeToolRouter
 
 
 # Role-specific system prompts
@@ -47,7 +54,11 @@ MAX_TOOL_ROUNDS = 10  # Max tool_use round-trips per execution
 
 
 class Agent:
-    """A specialized agent with a specific role and capabilities."""
+    """A specialized agent with a specific role and capabilities.
+
+    When tool_router is provided, all tool calls are validated
+    through the Kovrin safety pipeline before execution.
+    """
 
     MODEL = "claude-sonnet-4-20250514"
 
@@ -59,6 +70,7 @@ class Agent:
         system_prompt: str | None = None,
         client: anthropic.AsyncAnthropic | None = None,
         tools: ToolExecutor | None = None,
+        tool_router: "SafeToolRouter | None" = None,
     ):
         self.name = name
         self.role = role
@@ -66,6 +78,7 @@ class Agent:
         self.system_prompt = system_prompt or ROLE_PROMPTS.get(role, ROLE_PROMPTS[AgentRole.SPECIALIST])
         self._client = client or anthropic.AsyncAnthropic()
         self.tools = tools
+        self.tool_router = tool_router
 
     @property
     def info(self) -> AgentInfo:
@@ -115,20 +128,54 @@ class Agent:
 
         response = await self._client.messages.create(**api_kwargs)
 
-        # Tool use loop
+        # Tool use loop — with optional safety-gated routing
         rounds = 0
-        while response.stop_reason == "tool_use" and self.tools and rounds < MAX_TOOL_ROUNDS:
+        has_tools = self.tools or self.tool_router
+        while response.stop_reason == "tool_use" and has_tools and rounds < MAX_TOOL_ROUNDS:
             rounds += 1
 
             # Find all tool_use blocks in response
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    tool_result = await self.tools.execute(
-                        name=block.name,
-                        tool_input=block.input,
-                        tool_use_id=block.id,
-                    )
+                    if self.tool_router:
+                        # Safety-gated: route through SafeToolRouter
+                        from kovrin.tools.models import ToolCallRequest
+
+                        request = ToolCallRequest(
+                            tool_name=block.name,
+                            tool_input=block.input,
+                            tool_use_id=block.id,
+                            task_id=subtask.id,
+                            intent_id=subtask.parent_intent_id or "",
+                            agent_id=self.name,
+                        )
+                        decision = await self.tool_router.evaluate(request)
+
+                        if decision.allowed:
+                            tool_result = await self.tool_router.execute_if_allowed(request, decision)
+                        else:
+                            from kovrin.agents.tools import ToolResult
+                            tool_result = ToolResult(
+                                tool_use_id=block.id,
+                                content=f"[BLOCKED BY SAFETY] {decision.reason}",
+                                is_error=True,
+                            )
+                    elif self.tools:
+                        # Legacy: direct execution without safety routing
+                        tool_result = await self.tools.execute(
+                            name=block.name,
+                            tool_input=block.input,
+                            tool_use_id=block.id,
+                        )
+                    else:
+                        from kovrin.agents.tools import ToolResult
+                        tool_result = ToolResult(
+                            tool_use_id=block.id,
+                            content="No tool executor available",
+                            is_error=True,
+                        )
+
                     tool_results.append(tool_result)
 
                     traces.append(Trace(
@@ -141,6 +188,7 @@ class Agent:
                             "input": block.input,
                             "result": tool_result.content[:200],
                             "is_error": tool_result.is_error,
+                            "safety_gated": self.tool_router is not None,
                         },
                     ))
 

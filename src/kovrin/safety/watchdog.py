@@ -134,11 +134,148 @@ class UnexpectedEventSequence(TemporalRule):
         return None
 
 
+class ExcessiveToolCallRate(TemporalRule):
+    """Alert if an agent makes too many tool calls in rapid succession.
+
+    Monitors TOOL_CALL events and triggers PAUSE if the rate exceeds
+    the threshold within a 60-second window per intent.
+    """
+
+    def __init__(self, max_calls_per_minute: int = 30):
+        super().__init__(
+            name="excessive_tool_calls",
+            description=f"More than {max_calls_per_minute} tool calls per minute",
+            severity=ContainmentLevel.PAUSE,
+        )
+        self._max_calls = max_calls_per_minute
+
+    def check(self, event: HashedTrace, history: list[HashedTrace]) -> WatchdogAlert | None:
+        if event.trace.event_type != "TOOL_CALL":
+            return None
+
+        # Count TOOL_CALL events in the last 60 seconds for this intent
+        cutoff = event.trace.timestamp.timestamp() - 60.0
+        recent_calls = sum(
+            1 for h in history
+            if h.trace.event_type == "TOOL_CALL"
+            and h.trace.intent_id == event.trace.intent_id
+            and h.trace.timestamp.timestamp() > cutoff
+        )
+
+        if recent_calls >= self._max_calls:
+            return WatchdogAlert(
+                severity=self.severity,
+                reason=f"Excessive tool call rate: {recent_calls + 1} calls in last 60s (max {self._max_calls})",
+                task_id=event.trace.task_id,
+                intent_id=event.trace.intent_id,
+                rule=self.name,
+            )
+        return None
+
+
+class ToolEscalationDetection(TemporalRule):
+    """Detect escalation patterns in tool call risk levels within a single task.
+
+    If tool calls escalate from LOW → MEDIUM → HIGH within the same task,
+    this may indicate an agent attempting to gradually bypass safety controls.
+    """
+
+    _RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+
+    def __init__(self):
+        super().__init__(
+            name="tool_escalation_detection",
+            description="Tool call risk level escalation detected within same task",
+            severity=ContainmentLevel.WARN,
+        )
+
+    def check(self, event: HashedTrace, history: list[HashedTrace]) -> WatchdogAlert | None:
+        if event.trace.event_type != "TOOL_CALL":
+            return None
+
+        details = event.trace.details or {}
+        current_risk = details.get("risk_level", "LOW")
+        current_rank = self._RISK_ORDER.get(current_risk, 0)
+
+        if current_rank < 2:  # Only alert for HIGH+ escalation
+            return None
+
+        # Check if this task had lower-risk tool calls before
+        task_tool_risks = [
+            self._RISK_ORDER.get(h.trace.details.get("risk_level", "LOW"), 0)
+            for h in history
+            if h.trace.event_type == "TOOL_CALL"
+            and h.trace.task_id == event.trace.task_id
+            and h.trace.details
+        ]
+
+        if task_tool_risks and min(task_tool_risks) < current_rank:
+            return WatchdogAlert(
+                severity=self.severity,
+                reason=(
+                    f"Tool risk escalation in task {event.trace.task_id}: "
+                    f"previous min risk level escalated to {current_risk}"
+                ),
+                task_id=event.trace.task_id,
+                intent_id=event.trace.intent_id,
+                rule=self.name,
+            )
+        return None
+
+
+class ToolCallAfterBlock(TemporalRule):
+    """Detect attempts to call a tool that was previously blocked.
+
+    If a tool was blocked by the safety system and the agent
+    attempts to call it again, this is suspicious.
+    """
+
+    def __init__(self):
+        super().__init__(
+            name="tool_call_after_block",
+            description="Repeated tool call after safety block",
+            severity=ContainmentLevel.PAUSE,
+        )
+
+    def check(self, event: HashedTrace, history: list[HashedTrace]) -> WatchdogAlert | None:
+        if event.trace.event_type != "TOOL_CALL_BLOCKED":
+            return None
+
+        details = event.trace.details or {}
+        tool_name = details.get("tool_name", "")
+        if not tool_name:
+            return None
+
+        # Check if this tool was already blocked for this task
+        previous_blocks = sum(
+            1 for h in history
+            if h.trace.event_type == "TOOL_CALL_BLOCKED"
+            and h.trace.task_id == event.trace.task_id
+            and (h.trace.details or {}).get("tool_name") == tool_name
+        )
+
+        if previous_blocks >= 1:
+            return WatchdogAlert(
+                severity=self.severity,
+                reason=(
+                    f"Tool '{tool_name}' blocked {previous_blocks + 1} times for task "
+                    f"{event.trace.task_id} — possible safety bypass attempt"
+                ),
+                task_id=event.trace.task_id,
+                intent_id=event.trace.intent_id,
+                rule=self.name,
+            )
+        return None
+
+
 # Default rule set
 DEFAULT_RULES: list[TemporalRule] = [
     NoExecutionAfterRejection(),
     ExcessiveFailureRate(),
     UnexpectedEventSequence(),
+    ExcessiveToolCallRate(),
+    ToolEscalationDetection(),
+    ToolCallAfterBlock(),
 ]
 
 

@@ -404,10 +404,19 @@ class TestTraceLogSubscribe:
 
 class TestDefaultRules:
     def test_default_rules_exist(self):
-        assert len(DEFAULT_RULES) == 3
+        assert len(DEFAULT_RULES) == 6  # 3 original + 3 tool rules
 
     def test_default_rule_types(self):
         types = {type(r) for r in DEFAULT_RULES}
         assert NoExecutionAfterRejection in types
         assert ExcessiveFailureRate in types
         assert UnexpectedEventSequence in types
+        # Phase 1: Tool safety rules
+        from kovrin.safety.watchdog import (
+            ExcessiveToolCallRate,
+            ToolCallAfterBlock,
+            ToolEscalationDetection,
+        )
+        assert ExcessiveToolCallRate in types
+        assert ToolEscalationDetection in types
+        assert ToolCallAfterBlock in types

@@ -109,6 +109,7 @@ class Kovrin:
         enable_prm: bool = False,
         enable_tokens: bool = False,
         topology: bool = False,
+        tools: bool = False,
     ):
         """Initialize Kovrin.
 
@@ -128,6 +129,7 @@ class Kovrin:
             enable_prm: If True, enables Process Reward Model step-level evaluation.
             enable_tokens: If True, enables Delegation Capability Tokens for agents.
             topology: If True, enables automatic topology selection for task graphs.
+            tools: If True, enables safety-gated tool execution (code, web, file ops).
         """
         self._client = anthropic.AsyncAnthropic(api_key=api_key) if api_key else anthropic.AsyncAnthropic()
         self._constitutional = ConstitutionalCore(self._client)
@@ -140,11 +142,32 @@ class Kovrin:
             from kovrin.engine.prm import ProcessRewardModel
             self._prm = ProcessRewardModel(self._client)
 
+        # Safety-gated tool execution system
+        self._tools_enabled = tools
+        self._tool_registry = None
+        self._tool_router = None
+        if tools:
+            from kovrin.tools.registry import ToolRegistry
+            from kovrin.tools.router import SafeToolRouter
+            from kovrin.tools.builtin import register_all_builtins
+
+            self._tool_registry = ToolRegistry()
+            register_all_builtins(self._tool_registry)
+            self._tool_router = SafeToolRouter(
+                registry=self._tool_registry,
+                risk_router=self._router,
+                constitutional_core=self._constitutional,
+                token_authority=None,  # Set below after token_authority init
+                approval_callback=approval_callback,
+            )
+
         self._executor = TaskExecutor(
             self._client, self._router,
             approval_callback=approval_callback,
             autonomy_settings=autonomy_settings,
             prm=self._prm,
+            tool_registry=self._tool_registry,
+            tool_router=self._tool_router,
         )
         self._graph_executor = GraphExecutor(max_concurrent)
         self._safety_critic = SafetyCritic(self._constitutional)
@@ -163,6 +186,9 @@ class Kovrin:
         if enable_tokens:
             from kovrin.engine.tokens import TokenAuthority
             self._token_authority = TokenAuthority()
+            # Wire token authority into tool router for DCT scope checks
+            if self._tool_router:
+                self._tool_router._token_authority = self._token_authority
 
         # Multi-agent
         self._agents_enabled = agents
@@ -233,6 +259,10 @@ class Kovrin:
         """
         if trace_log is None:
             trace_log = ImmutableTraceLog()
+
+        # Wire trace log into tool router for Merkle audit of tool calls
+        if self._tool_router:
+            self._tool_router._trace_log = trace_log
 
         # Start watchdog if enabled
         if self._watchdog_enabled:
