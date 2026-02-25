@@ -60,7 +60,7 @@ class Agent:
     through the Kovrin safety pipeline before execution.
     """
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(
         self,

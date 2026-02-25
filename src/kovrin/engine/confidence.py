@@ -26,7 +26,7 @@ from kovrin.core.models import ConfidenceEstimate, SubTask
 class ConfidenceEstimator:
     """Estimates confidence in task outputs via Claude API."""
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(
         self,

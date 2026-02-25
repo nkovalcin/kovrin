@@ -164,7 +164,7 @@ class TestMCTSExplorer:
     async def test_explore_returns_best_and_all(self):
         parser = AsyncMock()
         parser.parse = AsyncMock(return_value=_make_subtasks(2))
-        parser.MODEL = "claude-sonnet-4-20250514"
+        parser.MODEL = "claude-sonnet-4-6"
         parser._parse_response = MagicMock(return_value=_make_subtasks(2, "variant"))
 
         scorer = AsyncMock()

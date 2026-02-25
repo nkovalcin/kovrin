@@ -14,10 +14,11 @@
 
 **Verzia frameworku:** `2.0.0a1`
 **Python:** `3.12+`
-**Stav:** Alpha — core + tools + providers + CLI implementované, **production-verified na Railway**
+**Stav:** Alpha — core + tools + providers + CLI + dashboard LIVE, **production-verified na Railway**
 **Licencia:** MIT
-**Deployment:** Railway (auto-deploy z `main`) — kovrin-api (FastAPI) + kovrin-web (Next.js)
-**Posledný verified test:** 2026-02-24 — full pipeline SUCCESS (4/4 tasks, 0 rejected, 12 web_search calls)
+**Deployment:** Railway (auto-deploy z `main`) — kovrin-api (FastAPI) + kovrin-web (Next.js, 3 služby)
+**Posledný verified test:** 2026-02-25 — full stack LIVE (dashboard CONNECTED, API healthy, WS active)
+**CLAUDE.md stratégia:** Tento súbor je **jediný globálny CLAUDE.md** pre oba repozitáre (kovrin + kovrin-web). V kovrin-web/ je len pointer sem.
 
 ---
 
@@ -321,6 +322,7 @@ source .venv/bin/activate            # Aktivuj venv
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 .venv/bin/python -m kovrin.cli run "Search for Python 3.13 features" --tools
+.venv/bin/python -m kovrin.cli shell                              # Interactive REPL (continuous)
 .venv/bin/python -m kovrin.cli verify                             # Merkle chain integrity
 .venv/bin/python -m kovrin.cli audit                              # List pipelines
 .venv/bin/python -m kovrin.cli audit <intent_id>                  # View audit trail
@@ -381,13 +383,15 @@ Každá doména je **samostatná Railway služba** (rovnaký kovrin-web repo, r�
 - `/changelog` — Version history
 
 **app.kovrin.dev (dashboard):**
-- `/app/overview` — Agent overview, risk scores, real-time events
-- `/app/pipeline` — Pipeline management
-- `/app/proposals` — SuperWork task proposals
-- `/app/approvals` — Human-in-the-loop approval queue
-- `/app/audit` — Merkle-verified audit log
-- `/app/feed` — Live event feed
-- `/app/settings` — API keys, team, integrations
+- `/overview` — Agent overview, risk scores, real-time events (root `/` redirects here)
+- `/pipeline` — Pipeline management
+- `/pipeline/[id]` — Pipeline detail
+- `/approvals` — Human-in-the-loop approval queue
+- `/audit` — Merkle-verified audit log
+- `/settings` — Autonomy profiles, system status
+- `/superwork` — SuperWork dashboard (session control + metrics)
+- `/superwork/proposals` — Task proposals from Orchestrator
+- `/superwork/feed` — Live event feed (WebSocket)
 
 ---
 
@@ -412,8 +416,8 @@ Každá doména je **samostatná Railway služba** (rovnaký kovrin-web repo, r�
 |-----|--------|---------|-------|
 | `SITE_MODE` | všetky 3 | 🔴 ÁNO | `marketing` / `dashboard` / `docs` — určuje ktoré routes sa servujú |
 | `DATABASE_URL` | marketing | 🟡 Voliteľné | PostgreSQL pre waitlist. Bez nej graceful degradation. |
-| `KOVRIN_API_INTERNAL_URL` | dashboard | 🔴 ÁNO | Interná Railway URL kovrin-api (napr. `http://kovrin-api.railway.internal:8000`). |
-| `NEXT_PUBLIC_KOVRIN_WS_URL` | dashboard | 🟡 Build-time | Verejná WS URL (napr. `wss://api.kovrin.dev`). Bez nej WebSocket disabled. |
+| `KOVRIN_API_INTERNAL_URL` | dashboard | 🔴 ÁNO | URL kovrin-api. Produkcia: `https://api.kovrin.dev`. (Internal `.railway.internal` nefunguje spoľahlivo — porty.) |
+| `NEXT_PUBLIC_KOVRIN_WS_URL` | dashboard | 🟡 Build-time | Verejná WS URL: `wss://api.kovrin.dev`. Bez nej WebSocket disabled. |
 | `NEXT_PUBLIC_MARKETING_URL` | všetky 3 | 🟡 | Default: `https://kovrin.dev` |
 | `NEXT_PUBLIC_DASHBOARD_URL` | všetky 3 | 🟡 | Default: `https://app.kovrin.dev` |
 | `NEXT_PUBLIC_DOCS_URL` | všetky 3 | 🟡 | Default: `https://docs.kovrin.dev` |
@@ -425,20 +429,31 @@ kovrin-web/
 │   ├── middleware.ts              # SITE_MODE routing (marketing/dashboard/docs)
 │   ├── lib/
 │   │   ├── domains.ts            # Cross-domain URL helpers (docsUrl, dashboardUrl, marketingUrl)
-│   │   ├── kovrin/api.ts         # Kovrin API client + WebSocket
-│   │   └── superwork/api.ts      # SuperWork API client + WebSocket
+│   │   ├── kovrin/
+│   │   │   ├── api.ts            # Kovrin pipeline API client + WebSocket
+│   │   │   ├── context.tsx       # KovrinProvider — React context (pipelines, WS, approvals)
+│   │   │   └── types.ts          # TypeScript types (PipelineStatus, Trace, WsMessage, ...)
+│   │   └── superwork/
+│   │       ├── api.ts            # SuperWork API client + WebSocket
+│   │       ├── context.tsx       # SuperWorkProvider — React context (session, metrics, proposals)
+│   │       └── types.ts          # SuperWork types (TaskProposal, MetricsSnapshot, ...)
 │   ├── app/
 │   │   ├── (marketing)/          # Route group — landing page (kovrin.dev)
 │   │   │   ├── layout.tsx
 │   │   │   └── page.tsx          # Hero, Features, Pricing, Waitlist, Comparison
-│   │   ├── app/                  # Dashboard routes (app.kovrin.dev)
-│   │   │   ├── overview/
-│   │   │   ├── approvals/
-│   │   │   ├── audit/
-│   │   │   ├── feed/
-│   │   │   ├── pipeline/
-│   │   │   ├── proposals/
-│   │   │   └── settings/
+│   │   ├── (dashboard)/          # Route group — dashboard (app.kovrin.dev)
+│   │   │   ├── layout.tsx        # KovrinProvider + Sidebar wrapper
+│   │   │   ├── overview/page.tsx
+│   │   │   ├── pipeline/page.tsx
+│   │   │   ├── pipeline/[id]/page.tsx
+│   │   │   ├── approvals/page.tsx
+│   │   │   ├── audit/page.tsx
+│   │   │   ├── settings/page.tsx
+│   │   │   └── superwork/        # SuperWork sub-routes (SuperWorkProvider wrapper)
+│   │   │       ├── layout.tsx
+│   │   │       ├── page.tsx      # Session control + metrics
+│   │   │       ├── proposals/page.tsx
+│   │   │       └── feed/page.tsx
 │   │   ├── docs/                 # Documentation (docs.kovrin.dev)
 │   │   │   ├── getting-started/
 │   │   │   ├── architecture/
@@ -446,11 +461,12 @@ kovrin-web/
 │   │   └── api/
 │   │       ├── waitlist/route.ts         # PostgreSQL waitlist (lazy pool)
 │   │       └── proxy/
-│   │           ├── kovrin/[...path]/     # Proxy → kovrin-api
-│   │           └── superwork/[...path]/  # Proxy → kovrin-api/superwork
+│   │           ├── kovrin/[...path]/     # Proxy → kovrin-api /api/*
+│   │           └── superwork/[...path]/  # Proxy → kovrin-api /api/superwork/*
 │   └── components/
-│       ├── kovrin/               # Pipeline dashboard components
-│       └── superwork/            # SuperWork dashboard components
+│       ├── kovrin/               # Pipeline dashboard components (sidebar, pipeline-list, risk-badge, ...)
+│       └── superwork/            # SuperWork components (session-control, metrics-panel, proposal-queue, live-feed, metric-card)
+├── CLAUDE.md                 # Pointer → kovrin/CLAUDE.md
 ├── railway.toml              # builder = nixpacks
 ├── nixpacks.toml             # Node 20, npm ci, npm run build
 └── package.json              # Next.js 16, React 19, Tailwind v4
@@ -468,16 +484,19 @@ curl -s -o /dev/null -w "%{http_code}" https://kovrin.dev/
 # Docs
 curl -s -o /dev/null -w "%{http_code}" https://docs.kovrin.dev/getting-started
 
-# Dashboard
-curl -s -o /dev/null -w "%{http_code}" https://app.kovrin.dev/app/overview
+# Dashboard (redirects / → /overview)
+curl -s -o /dev/null -w "%{http_code}" https://app.kovrin.dev/overview
 
-# API
+# Dashboard → API proxy (should return JSON, not 502)
+curl https://app.kovrin.dev/api/proxy/kovrin/status
+
+# API direct
 curl https://api.kovrin.dev/api/health
 
 # Run pipeline
-curl -X POST https://api.kovrin.dev/api/pipeline \
+curl -X POST https://api.kovrin.dev/api/run \
   -H "Content-Type: application/json" \
-  -d '{"intent": "Search for AI safety frameworks", "tools": true}'
+  -d '{"intent": "Search for AI safety frameworks", "constraints": [], "context": {}}'
 ```
 
 ---
@@ -537,7 +556,7 @@ curl -X POST https://api.kovrin.dev/api/pipeline \
 | `docs/CLAUDE_OPENSOURCE.md` | ✅ Vyriešené | Zmazané — navrhovala neexistujúcu štruktúru, plne superseded root CLAUDE.md. |
 | SQLite v produkcii | 🟡 Stredná | Pre produkciu → Temporal/EventStoreDB/Kafka |
 | Multi-model | ✅ Vyriešené | ClaudeProvider, OpenAIProvider, OllamaProvider + ModelRouter |
-| CLI | ✅ Vyriešené | `kovrin run`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
+| CLI | ✅ Vyriešené | `kovrin run`, `kovrin shell`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
 | GitHub Actions CI | ✅ Vyriešené | pytest + coverage + mypy + ruff + pip-audit |
 | Tool execution | ✅ Vyriešené | 8 safety-gated tools, SafeToolRouter, Brave Search API (live, verified) |
 | Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (10 types) |
@@ -549,6 +568,10 @@ curl -X POST https://api.kovrin.dev/api/pipeline \
 | `dashboard/` v kovrin repo je zastaraný | 🟡 Stredná | Starý Vite+React prototyp. Produkčný frontend je v `kovrin-web/` repo. Zvážiť odstránenie alebo archív. |
 | kovrin-web `cacheDirectories` | ✅ Vyriešené | `[".next/cache"]` only. **POZOR:** `node_modules` NESMIE byť v cacheDirectories — Nixpacks ho mountne ako prázdny Docker cache volume cez nainštalované balíčky → `next: not found`. npm ci má vlastný cache cez `/root/.npm`. |
 | kovrin-web GitHub Actions CI | ✅ Vyriešené | ESLint + TypeScript + Next.js build + npm audit. |
+| Dashboard URL prefix `/app/` | ✅ Vyriešené (2026-02-25) | Presunuté z `src/app/app/*` → `src/app/(dashboard)/*` route group. Čisté URL: `/overview`, `/pipeline`, atď. |
+| Dashboard DISCONNECTED | ✅ Vyriešené (2026-02-25) | Railway `.railway.internal` nefungoval (port mismatch). Fix: `KOVRIN_API_INTERNAL_URL=https://api.kovrin.dev`. |
+| SuperWork unused sidebar | ✅ Vyriešené (2026-02-25) | `components/superwork/sidebar.tsx` sa nikde neimportoval. Vymazaný. SuperWork stránky používajú hlavný Kovrin sidebar. |
+| SuperWork error handling | ✅ Vyriešené (2026-02-25) | Všetky catch bloky mali prázdne `// error`. Pridaný error state + UI do SessionControl, ProposalQueue, MetricsPanel, LiveFeed. |
 
 ---
 
@@ -624,7 +647,7 @@ curl -X POST https://api.kovrin.dev/api/pipeline \
 | Font (code/UI) | JetBrains Mono |
 | Font (display) | Instrument Sans |
 | Font (body) | DM Sans |
-| Framework | Next.js 15 + Tailwind CSS v4 + shadcn/ui (0 radius) |
+| Framework | Next.js 16 + Tailwind CSS v4 + shadcn/ui (0 radius) |
 | Icons | Lucide React |
 
 Kompletná design spec: `docs/kovrin-design-spec.jsx`
@@ -759,14 +782,15 @@ Platforma: Web app (Next.js) → Desktop (Tauri) → Mouse-less AI workspace.
 ## Priorita práce (poradie pre Claude Code)
 
 1. 🔴 **Safety correctness** — Nikdy neporušiť 6 invariantov
-2. ✅ ~~TypeScript drift fix~~ — Vyriešené (regenerované cez SchemaExporter)
-3. 🟡 **SuperWork — Session Watcher** — základ celej SuperWork vrstvy
-4. 🟡 **SuperWork — Context Injector** — ChromaDB + RAG
-5. 🟡 **SuperWork — Orchestrator** — Opus analysis + proposals
-6. 🟡 **SuperWork — Dashboard** — React supervisor UI
-7. 🟢 **Public API poriadok** — Čisté exports z `__init__.py`
+2. ✅ ~~TypeScript drift fix~~ — Vyriešené
+3. ✅ ~~Dashboard DISCONNECTED~~ — Vyriešené (`KOVRIN_API_INTERNAL_URL=https://api.kovrin.dev`)
+4. ✅ ~~Dashboard URL refactor~~ — Vyriešené (route groups, čisté URL)
+5. ✅ ~~SuperWork error handling~~ — Vyriešené (error states, Stop button, WS warning)
+6. 🟡 **End-to-end SuperWork pipeline test** — posledný item Fázy 1
+7. 🟡 **SuperWork UI doladenie** — UX nie je ešte kompletné
 8. 🟢 **Test coverage** — Každá public metóda má testy
-9. 🔵 **CLI** — `kovrin run`, `kovrin verify`, `kovrin audit`, `kovrin superwork`
+9. 🟢 **Hardcoded model strings** — ~10 miest → provider abstrakcia
+10. 🔵 **Fáza 2** — Native Mac App (Tauri)
 
 ---
 
@@ -782,8 +806,8 @@ Platforma: Web app (Next.js) → Desktop (Tauri) → Mouse-less AI workspace.
 ║                                                                              ║
 ║  KOVRIN-WEB REPO (~/Desktop/projects/kovrin-web/):                           ║
 ║    Marketing:   src/app/(marketing)/page.tsx                                 ║
-║    Dashboard:   src/app/app/  (overview, proposals, audit, ...)              ║
-║    Proxy:       src/app/api/proxy/  (→ kovrin-api)                           ║
+║    Dashboard:   src/app/(dashboard)/  (overview, pipeline, superwork, ...)   ║
+║    Proxy:       src/app/api/proxy/  (→ api.kovrin.dev)                       ║
 ║    Stack:       Next.js 16 + React 19 + Tailwind v4                          ║
 ║                                                                              ║
 ║  DOMÉNY: kovrin.dev (marketing) | app.kovrin.dev (dashboard)                 ║

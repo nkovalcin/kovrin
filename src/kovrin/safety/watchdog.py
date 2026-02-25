@@ -626,7 +626,7 @@ Then provide a brief reason on the second line."""
 
         try:
             response = await self._client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=100,
                 messages=[{"role": "user", "content": prompt}],
             )

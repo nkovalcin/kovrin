@@ -44,7 +44,7 @@ class FeasibilityCritic:
     technical feasibility using Claude API analysis.
     """
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(
         self,
@@ -135,7 +135,7 @@ class PolicyCritic:
     (e.g., "Do not suggest layoffs", "Focus on operational costs only").
     """
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(self, client: anthropic.AsyncAnthropic | None = None):
         self._client = client or anthropic.AsyncAnthropic()

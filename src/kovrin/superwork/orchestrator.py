@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ORCHESTRATOR_MODEL = "claude-opus-4-20250514"
+ORCHESTRATOR_MODEL = "claude-opus-4-6"
 ANALYSIS_MAX_TOKENS = 4096
 
 SYSTEM_PROMPT = """\

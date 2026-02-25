@@ -51,7 +51,7 @@ def main() -> None:
     )
     @click.option(
         "--model",
-        default="claude-opus-4-20250514",
+        default="claude-opus-4-6",
         help="Claude model for the Orchestrator Agent.",
     )
     def superwork(project: str, database_url: str | None, model: str) -> None:

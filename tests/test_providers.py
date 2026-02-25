@@ -116,7 +116,7 @@ class TestProviderConfig:
 
 class TestClaudeProvider:
     def test_default_model(self):
-        assert ClaudeProvider.DEFAULT_MODEL == "claude-sonnet-4-20250514"
+        assert ClaudeProvider.DEFAULT_MODEL == "claude-sonnet-4-6"
 
     def test_supports_tool_use(self):
         client = MagicMock()
@@ -141,7 +141,7 @@ class TestClaudeProvider:
         text_block.text = "Hello, world!"
         mock_response.content = [text_block]
         mock_response.stop_reason = "end_turn"
-        mock_response.model = "claude-sonnet-4-20250514"
+        mock_response.model = "claude-sonnet-4-6"
         mock_response.usage = MagicMock(input_tokens=10, output_tokens=5)
 
         result = ClaudeProvider._to_response(mock_response)
@@ -161,7 +161,7 @@ class TestClaudeProvider:
         tool_block.id = "tool-abc"
         mock_response.content = [tool_block]
         mock_response.stop_reason = "tool_use"
-        mock_response.model = "claude-sonnet-4-20250514"
+        mock_response.model = "claude-sonnet-4-6"
         mock_response.usage = MagicMock(input_tokens=20, output_tokens=15)
 
         result = ClaudeProvider._to_response(mock_response)
@@ -192,7 +192,7 @@ class TestClaudeProvider:
         text_block.text = "Response"
         mock_response.content = [text_block]
         mock_response.stop_reason = "end_turn"
-        mock_response.model = "claude-sonnet-4-20250514"
+        mock_response.model = "claude-sonnet-4-6"
         mock_response.usage = MagicMock(input_tokens=5, output_tokens=3)
         client.messages = MagicMock()
         client.messages.create = AsyncMock(return_value=mock_response)

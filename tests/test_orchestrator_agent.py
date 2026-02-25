@@ -29,7 +29,7 @@ class TestOrchestratorConstruction:
             context_injector=mock_context,
             metrics_tracker=mock_metrics,
         )
-        assert orch._model == "claude-opus-4-20250514"
+        assert orch._model == "claude-opus-4-6"
         assert orch._task_history == []
 
     def test_custom_model(self):
@@ -38,9 +38,9 @@ class TestOrchestratorConstruction:
         orch = OrchestratorAgent(
             context_injector=MagicMock(),
             metrics_tracker=MagicMock(),
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
         )
-        assert orch._model == "claude-sonnet-4-20250514"
+        assert orch._model == "claude-sonnet-4-6"
 
 
 class TestRecordCompletion:

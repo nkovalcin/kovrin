@@ -47,7 +47,7 @@ Respond with ONLY valid JSON (no markdown, no code fences):
 class ProcessRewardModel:
     """Evaluates task outputs at the step level using Claude API."""
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(
         self,

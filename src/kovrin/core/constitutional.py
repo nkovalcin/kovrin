@@ -92,7 +92,7 @@ class ConstitutionalCore:
     tampering is detected via verify_integrity().
     """
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(self, client: anthropic.AsyncAnthropic | None = None):
         self._client = client or anthropic.AsyncAnthropic()

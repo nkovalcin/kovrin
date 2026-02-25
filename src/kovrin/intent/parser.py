@@ -29,7 +29,7 @@ from kovrin.intent.schema import IntentV2
 class IntentParser:
     """Decomposes intents into sub-task graphs via Claude API."""
 
-    MODEL = "claude-sonnet-4-20250514"
+    MODEL = "claude-sonnet-4-6"
 
     def __init__(self, client: anthropic.AsyncAnthropic | None = None):
         self._client = client or anthropic.AsyncAnthropic()
