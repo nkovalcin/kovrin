@@ -28,8 +28,10 @@ from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.constitutional import ConstitutionalCore
 from kovrin.core.models import (
     AutonomySettings,
+    DEFAULT_MODEL_ROUTING,
     ExecutionResult,
     ExplorationResult,
+    ModelTier,
     SubTask,
     TaskStatus,
     Trace,
@@ -52,6 +54,8 @@ __all__ = [
     "ConstitutionalCore",
     # Models
     "AutonomySettings",
+    "DEFAULT_MODEL_ROUTING",
+    "ModelTier",
     "ExplorationResult",
     "ExecutionResult",
     "SubTask",
@@ -110,6 +114,7 @@ class Kovrin:
         enable_tokens: bool = False,
         topology: bool = False,
         tools: bool = False,
+        model_routing: dict[str, str] | None = None,
     ):
         """Initialize Kovrin.
 
@@ -130,12 +135,21 @@ class Kovrin:
             enable_tokens: If True, enables Delegation Capability Tokens for agents.
             topology: If True, enables automatic topology selection for task graphs.
             tools: If True, enables safety-gated tool execution (code, web, file ops).
+            model_routing: Optional dict overriding which model each component uses.
+                           Keys: component names (e.g., "intent_parser", "task_executor").
+                           Values: model ID strings (e.g., "claude-sonnet-4-6").
+                           See DEFAULT_MODEL_ROUTING for all keys.
         """
+        self._model_routing = model_routing or {}
         self._client = (
             anthropic.AsyncAnthropic(api_key=api_key) if api_key else anthropic.AsyncAnthropic()
         )
-        self._constitutional = ConstitutionalCore(self._client)
-        self._parser = IntentParser(self._client)
+        self._constitutional = ConstitutionalCore(
+            self._client, model=self._model_routing.get("constitutional_core")
+        )
+        self._parser = IntentParser(
+            self._client, model=self._model_routing.get("intent_parser")
+        )
         self._router = RiskRouter()
 
         # Phase 6: PRM
@@ -143,7 +157,9 @@ class Kovrin:
         if enable_prm:
             from kovrin.engine.prm import ProcessRewardModel
 
-            self._prm = ProcessRewardModel(self._client)
+            self._prm = ProcessRewardModel(
+                self._client, model=self._model_routing.get("prm")
+            )
 
         # Safety-gated tool execution system
         self._tools_enabled = tools
@@ -172,13 +188,20 @@ class Kovrin:
             prm=self._prm,
             tool_registry=self._tool_registry,
             tool_router=self._tool_router,
+            model=self._model_routing.get("task_executor"),
         )
         self._graph_executor = GraphExecutor(max_concurrent)
         self._safety_critic = SafetyCritic(self._constitutional)
         # Pass available tool names to FeasibilityCritic so it knows agent capabilities
         _tool_names = [t.name for t in self._tool_registry.get_all()] if self._tool_registry else []
-        self._feasibility_critic = FeasibilityCritic(self._client, available_tools=_tool_names)
-        self._policy_critic = PolicyCritic(self._client)
+        self._feasibility_critic = FeasibilityCritic(
+            self._client,
+            available_tools=_tool_names,
+            model=self._model_routing.get("feasibility_critic"),
+        )
+        self._policy_critic = PolicyCritic(
+            self._client, model=self._model_routing.get("policy_critic")
+        )
         self._critics = CriticPipeline(
             self._safety_critic, self._feasibility_critic, self._policy_critic
         )
@@ -249,7 +272,9 @@ class Kovrin:
         if enable_confidence:
             from kovrin.engine.confidence import ConfidenceEstimator
 
-            self._confidence = ConfidenceEstimator(self._client)
+            self._confidence = ConfidenceEstimator(
+                self._client, model=self._model_routing.get("confidence_estimator")
+            )
 
     def update_autonomy_settings(self, settings: AutonomySettings | None) -> None:
         """Update autonomy settings at runtime. Forwards to executor."""
@@ -283,6 +308,7 @@ class Kovrin:
             self._watchdog = WatchdogAgent(
                 client=self._client,
                 enable_agent_drift=self._enable_agent_drift,
+                model=self._model_routing.get("watchdog"),
             )
             await self._watchdog.start(trace_log, intent)
 

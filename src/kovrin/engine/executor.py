@@ -26,6 +26,7 @@ import anthropic
 from kovrin.core.models import (
     ApprovalRequest,
     AutonomySettings,
+    DEFAULT_MODEL_ROUTING,
     RoutingAction,
     SubTask,
     TaskStatus,
@@ -51,7 +52,7 @@ class TaskExecutor:
     every tool call validated through the Kovrin safety pipeline.
     """
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["task_executor"].value
 
     def __init__(
         self,
@@ -62,9 +63,11 @@ class TaskExecutor:
         prm: ProcessRewardModel | None = None,
         tool_registry: ToolRegistry | None = None,
         tool_router: SafeToolRouter | None = None,
+        model: str | None = None,
     ):
         self._client = client or anthropic.AsyncAnthropic()
         self._router = risk_router or RiskRouter()
+        self._model = model or self.MODEL
         self._approval_callback = approval_callback
         self._autonomy_settings = autonomy_settings
         self._prm = prm
@@ -152,7 +155,7 @@ If it requires generation, be creative yet precise."""
         # Build API call kwargs
         messages = [{"role": "user", "content": prompt}]
         api_kwargs: dict = {
-            "model": self.MODEL,
+            "model": self._model,
             "max_tokens": 4096,
             "messages": messages,
         }
@@ -257,7 +260,7 @@ If it requires generation, be creative yet precise."""
                 task_id=subtask.id,
                 event_type="EXECUTION_COMPLETE",
                 description=f"Completed: {subtask.description[:60]}",
-                details={"output_length": len(result), "tool_rounds": rounds},
+                details={"output_length": len(result), "tool_rounds": rounds, "model": self._model},
                 risk_level=subtask.risk_level,
             )
         )

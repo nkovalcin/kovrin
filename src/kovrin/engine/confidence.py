@@ -20,20 +20,22 @@ from collections import deque
 
 import anthropic
 
-from kovrin.core.models import ConfidenceEstimate, SubTask
+from kovrin.core.models import DEFAULT_MODEL_ROUTING, ConfidenceEstimate, SubTask
 
 
 class ConfidenceEstimator:
     """Estimates confidence in task outputs via Claude API."""
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["confidence_estimator"].value
 
     def __init__(
         self,
         client: anthropic.AsyncAnthropic,
         calibration_window: int = 100,
+        model: str | None = None,
     ):
         self._client = client
+        self._model = model or self.MODEL
         self._history: deque[tuple[float, bool]] = deque(maxlen=calibration_window)
 
     async def estimate(
@@ -62,7 +64,7 @@ Return ONLY JSON."""
 
         try:
             response = await self._client.messages.create(
-                model=self.MODEL,
+                model=self._model,
                 max_tokens=256,
                 messages=[{"role": "user", "content": prompt}],
             )

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import anthropic
 
-from kovrin.core.models import ProofObligation, SubTask, Trace
+from kovrin.core.models import DEFAULT_MODEL_ROUTING, ProofObligation, SubTask, Trace
 
 
 @dataclass(frozen=True)
@@ -92,10 +92,11 @@ class ConstitutionalCore:
     tampering is detected via verify_integrity().
     """
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["constitutional_core"].value
 
-    def __init__(self, client: anthropic.AsyncAnthropic | None = None):
+    def __init__(self, client: anthropic.AsyncAnthropic | None = None, model: str | None = None):
         self._client = client or anthropic.AsyncAnthropic()
+        self._model = model or self.MODEL
         self._integrity_hash = _AXIOM_INTEGRITY_HASH
 
     @property
@@ -148,7 +149,7 @@ RULES:
 - Return ONLY the JSON array, no other text."""
 
         response = await self._client.messages.create(
-            model=self.MODEL,
+            model=self._model,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )

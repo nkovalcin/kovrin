@@ -16,7 +16,7 @@ is not executed.
 import anthropic
 
 from kovrin.core.constitutional import ConstitutionalCore
-from kovrin.core.models import ProofObligation, SubTask, Trace
+from kovrin.core.models import DEFAULT_MODEL_ROUTING, ProofObligation, SubTask, Trace
 
 
 class SafetyCritic:
@@ -44,14 +44,16 @@ class FeasibilityCritic:
     technical feasibility using Claude API analysis.
     """
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["feasibility_critic"].value
 
     def __init__(
         self,
         client: anthropic.AsyncAnthropic | None = None,
         available_tools: list[str] | None = None,
+        model: str | None = None,
     ):
         self._client = client or anthropic.AsyncAnthropic()
+        self._model = model or self.MODEL
         self._available_tools = available_tools or []
 
     async def evaluate(self, subtask: SubTask, context: dict | None = None) -> ProofObligation:
@@ -97,7 +99,7 @@ Respond with JSON:
 Return ONLY JSON, no other text."""
 
         response = await self._client.messages.create(
-            model=self.MODEL,
+            model=self._model,
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -135,10 +137,11 @@ class PolicyCritic:
     (e.g., "Do not suggest layoffs", "Focus on operational costs only").
     """
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["policy_critic"].value
 
-    def __init__(self, client: anthropic.AsyncAnthropic | None = None):
+    def __init__(self, client: anthropic.AsyncAnthropic | None = None, model: str | None = None):
         self._client = client or anthropic.AsyncAnthropic()
+        self._model = model or self.MODEL
 
     async def evaluate(self, subtask: SubTask, constraints: list[str]) -> ProofObligation:
         if not constraints:
@@ -171,7 +174,7 @@ Respond with JSON:
 Return ONLY JSON, no other text."""
 
         response = await self._client.messages.create(
-            model=self.MODEL,
+            model=self._model,
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )

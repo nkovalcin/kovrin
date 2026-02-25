@@ -88,6 +88,30 @@ class ToolCategory(str, Enum):
     EXTERNAL_API = "EXTERNAL_API"
 
 
+class ModelTier(str, Enum):
+    """Claude model tier for smart routing — right model for the right task."""
+
+    HAIKU = "claude-haiku-4-5"
+    SONNET = "claude-sonnet-4-6"
+    OPUS = "claude-opus-4-6"
+
+
+# Default routing — which model each component uses
+DEFAULT_MODEL_ROUTING: dict[str, ModelTier] = {
+    "intent_parser": ModelTier.HAIKU,
+    "feasibility_critic": ModelTier.HAIKU,
+    "policy_critic": ModelTier.HAIKU,
+    "confidence_estimator": ModelTier.HAIKU,
+    "prm": ModelTier.HAIKU,
+    "task_executor": ModelTier.SONNET,
+    "safety_critic": ModelTier.SONNET,
+    "constitutional_core": ModelTier.SONNET,
+    "base_agent": ModelTier.SONNET,
+    "watchdog": ModelTier.SONNET,
+    "orchestrator": ModelTier.OPUS,
+}
+
+
 # ─── Proof Obligations ──────────────────────────────────────
 
 

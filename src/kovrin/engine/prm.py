@@ -16,7 +16,7 @@ import json
 
 import anthropic
 
-from kovrin.core.models import PrmScore, PrmStepScore, SubTask, Trace
+from kovrin.core.models import DEFAULT_MODEL_ROUTING, PrmScore, PrmStepScore, SubTask, Trace
 
 _PRM_PROMPT = """You are a Process Reward Model evaluating the quality of each reasoning step in an AI-generated output.
 
@@ -47,14 +47,16 @@ Respond with ONLY valid JSON (no markdown, no code fences):
 class ProcessRewardModel:
     """Evaluates task outputs at the step level using Claude API."""
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["prm"].value
 
     def __init__(
         self,
         client: anthropic.AsyncAnthropic,
         threshold: float = 0.6,
+        model: str | None = None,
     ):
         self._client = client
+        self._model = model or self.MODEL
         self._threshold = threshold
 
     @property
@@ -85,7 +87,7 @@ class ProcessRewardModel:
 
         try:
             response = await self._client.messages.create(
-                model=self.MODEL,
+                model=self._model,
                 max_tokens=2048,
                 messages=[{"role": "user", "content": prompt}],
             )

@@ -24,6 +24,33 @@ import asyncio
 import sys
 
 
+def _build_model_routing(preset: str) -> dict[str, str] | None:
+    """Build model routing dict from a named preset.
+
+    Presets:
+        smart  — Haiku for parsing/classification, Sonnet for execution/safety, Opus for orchestration
+        sonnet — All components use Sonnet (legacy behavior)
+        opus   — All components use Opus (max quality, expensive)
+    """
+    from kovrin.core.models import ModelTier
+
+    if preset == "smart":
+        return None  # Use DEFAULT_MODEL_ROUTING (already smart)
+    elif preset == "sonnet":
+        return {k: ModelTier.SONNET.value for k in [
+            "intent_parser", "feasibility_critic", "policy_critic",
+            "confidence_estimator", "prm", "task_executor", "safety_critic",
+            "constitutional_core", "base_agent", "watchdog", "orchestrator",
+        ]}
+    elif preset == "opus":
+        return {k: ModelTier.OPUS.value for k in [
+            "intent_parser", "feasibility_critic", "policy_critic",
+            "confidence_estimator", "prm", "task_executor", "safety_critic",
+            "constitutional_core", "base_agent", "watchdog", "orchestrator",
+        ]}
+    return None
+
+
 def cli() -> None:
     """Main CLI entry point. Uses click if available, falls back to argparse."""
     try:
@@ -53,6 +80,12 @@ def _click_cli() -> None:
     @click.option("--agents", is_flag=True, help="Enable multi-agent coordination")
     @click.option("--constraints", "-c", multiple=True, help="Add constraints (repeatable)")
     @click.option("--json-output", is_flag=True, help="Output as JSON")
+    @click.option(
+        "--routing",
+        type=click.Choice(["smart", "sonnet", "opus"]),
+        default="smart",
+        help="Model routing preset (smart=Haiku/Sonnet/Opus, sonnet=all Sonnet, opus=all Opus)",
+    )
     def run(
         intent: str,
         tools: bool,
@@ -60,6 +93,7 @@ def _click_cli() -> None:
         agents: bool,
         constraints: tuple[str, ...],
         json_output: bool,
+        routing: str,
     ) -> None:
         """Execute a Kovrin pipeline from an intent."""
         asyncio.run(
@@ -70,6 +104,7 @@ def _click_cli() -> None:
                 agents=agents,
                 constraints=list(constraints),
                 json_output=json_output,
+                model_routing=_build_model_routing(routing),
             )
         )
 
@@ -101,13 +136,20 @@ def _click_cli() -> None:
     @click.option("--no-tools", is_flag=True, help="Disable tool execution")
     @click.option("--watchdog", is_flag=True, help="Enable watchdog monitoring")
     @click.option("--agents", is_flag=True, help="Enable multi-agent coordination")
-    def shell(no_tools: bool, watchdog: bool, agents: bool) -> None:
+    @click.option(
+        "--routing",
+        type=click.Choice(["smart", "sonnet", "opus"]),
+        default="smart",
+        help="Model routing preset (smart=Haiku/Sonnet/Opus, sonnet=all Sonnet, opus=all Opus)",
+    )
+    def shell(no_tools: bool, watchdog: bool, agents: bool, routing: str) -> None:
         """Interactive Kovrin shell — continuous REPL mode."""
         asyncio.run(
             _shell(
                 tools=not no_tools,
                 watchdog=watchdog,
                 agents=agents,
+                model_routing=_build_model_routing(routing),
             )
         )
 
@@ -135,6 +177,10 @@ def _argparse_cli() -> None:
     run_parser.add_argument("--agents", action="store_true", help="Enable multi-agent")
     run_parser.add_argument("-c", "--constraint", action="append", dest="constraints", default=[])
     run_parser.add_argument("--json", action="store_true", dest="json_output")
+    run_parser.add_argument(
+        "--routing", choices=["smart", "sonnet", "opus"], default="smart",
+        help="Model routing preset",
+    )
 
     # audit
     audit_parser = subparsers.add_parser("audit", help="View audit trail")
@@ -157,6 +203,10 @@ def _argparse_cli() -> None:
     shell_parser.add_argument("--no-tools", action="store_true", help="Disable tools")
     shell_parser.add_argument("--watchdog", action="store_true", help="Enable watchdog")
     shell_parser.add_argument("--agents", action="store_true", help="Enable multi-agent")
+    shell_parser.add_argument(
+        "--routing", choices=["smart", "sonnet", "opus"], default="smart",
+        help="Model routing preset",
+    )
 
     args = parser.parse_args()
 
@@ -169,6 +219,7 @@ def _argparse_cli() -> None:
                 agents=args.agents,
                 constraints=args.constraints,
                 json_output=args.json_output,
+                model_routing=_build_model_routing(args.routing),
             )
         )
     elif args.command == "audit":
@@ -185,6 +236,7 @@ def _argparse_cli() -> None:
                 tools=not args.no_tools,
                 watchdog=args.watchdog,
                 agents=args.agents,
+                model_routing=_build_model_routing(args.routing),
             )
         )
     else:
@@ -198,6 +250,7 @@ async def _run_pipeline(
     agents: bool = False,
     constraints: list[str] | None = None,
     json_output: bool = False,
+    model_routing: dict[str, str] | None = None,
 ) -> None:
     """Execute a Kovrin pipeline and print results."""
     from kovrin import Kovrin
@@ -210,9 +263,13 @@ async def _run_pipeline(
     print(f"  Agents: {'enabled' if agents else 'disabled'}")
     if constraints:
         print(f"  Constraints: {', '.join(constraints)}")
+    routing_label = "smart" if model_routing is None else "custom"
+    if model_routing and all(v == model_routing.get("intent_parser") for v in model_routing.values()):
+        routing_label = model_routing["intent_parser"].split("-")[1]  # e.g. "sonnet" or "opus"
+    print(f"  Routing: {routing_label}")
     print()
 
-    engine = Kovrin(tools=tools, watchdog=watchdog, agents=agents)
+    engine = Kovrin(tools=tools, watchdog=watchdog, agents=agents, model_routing=model_routing)
     trace_log = ImmutableTraceLog()
 
     # Subscribe to trace events for live output
@@ -411,6 +468,7 @@ async def _shell(
     tools: bool = True,
     watchdog: bool = False,
     agents: bool = False,
+    model_routing: dict[str, str] | None = None,
 ) -> None:
     """Interactive Kovrin shell — continuous REPL mode.
 
@@ -438,7 +496,7 @@ async def _shell(
     from kovrin.storage.repository import PipelineRepository
 
     # Initialize engine once
-    engine = Kovrin(tools=tools, watchdog=watchdog, agents=agents)
+    engine = Kovrin(tools=tools, watchdog=watchdog, agents=agents, model_routing=model_routing)
     trace_log = ImmutableTraceLog()
 
     # Track session
@@ -454,8 +512,12 @@ async def _shell(
     print(f"\n  {'=' * 62}")
     print(f"  Kovrin Interactive Shell v{__version__}")
     print(f"  {'=' * 62}")
+    routing_label = "smart (Haiku/Sonnet/Opus)"
+    if model_routing and all(v == model_routing.get("intent_parser") for v in model_routing.values()):
+        tier = model_routing["intent_parser"].split("-")[1]  # e.g. "sonnet" or "opus"
+        routing_label = f"{tier} (all {tier.title()})"
     print(f"  Tools: {tool_count} enabled" if tools else "  Tools: disabled")
-    print(f"  Watchdog: {'on' if watchdog else 'off'} | Agents: {'on' if agents else 'off'}")
+    print(f"  Watchdog: {'on' if watchdog else 'off'} | Agents: {'on' if agents else 'off'} | Routing: {routing_label}")
     print("  Type /help for commands, /exit to quit")
     print(f"  {'=' * 62}\n")
 

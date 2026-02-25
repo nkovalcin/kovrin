@@ -21,7 +21,14 @@ import time
 import anthropic
 
 from kovrin.audit.trace_logger import HashedTrace, ImmutableTraceLog
-from kovrin.core.models import AgentDriftMetrics, ContainmentLevel, DriftLevel, Trace, WatchdogAlert
+from kovrin.core.models import (
+    AgentDriftMetrics,
+    ContainmentLevel,
+    DEFAULT_MODEL_ROUTING,
+    DriftLevel,
+    Trace,
+    WatchdogAlert,
+)
 
 
 class TemporalRule:
@@ -508,12 +515,15 @@ class WatchdogAgent:
     the pipeline.
     """
 
+    MODEL = DEFAULT_MODEL_ROUTING["watchdog"].value
+
     def __init__(
         self,
         rules: list[TemporalRule] | None = None,
         enable_drift_detection: bool = False,
         client: anthropic.AsyncAnthropic | None = None,
         enable_agent_drift: bool = False,
+        model: str | None = None,
     ):
         base_rules = rules or list(DEFAULT_RULES)
         if enable_agent_drift:
@@ -524,6 +534,7 @@ class WatchdogAgent:
         self.rules = base_rules
         self.enable_drift_detection = enable_drift_detection
         self._client = client
+        self._model = model or self.MODEL
         self.alerts: list[WatchdogAlert] = []
         self._pause_event = asyncio.Event()
         self._pause_event.set()  # Not paused initially
@@ -626,7 +637,7 @@ Then provide a brief reason on the second line."""
 
         try:
             response = await self._client.messages.create(
-                model="claude-sonnet-4-6",
+                model=self._model,
                 max_tokens=100,
                 messages=[{"role": "user", "content": prompt}],
             )
