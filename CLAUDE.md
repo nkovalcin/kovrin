@@ -685,7 +685,8 @@ superwork = [
 - [x] `pip install kovrin` na PyPI — `kovrin-2.0.0a1` (whl + sdist, published 2026-02-24)
 - [x] GitHub Release v2.0.0a1 — prerelease, published 2026-02-24
 - [x] GitHub repo public — `github.com/nkovalcin/kovrin`
-- [x] DNS verifikácia — kovrin.dev (200), app.kovrin.dev (200), docs.kovrin.dev (200), api.kovrin.dev (offline — Railway service stopped)
+- [x] DNS verifikácia — všetky 4 domény live: kovrin.dev, app.kovrin.dev, docs.kovrin.dev, api.kovrin.dev
+- [x] kovrin-api na Railway — custom domain `api.kovrin.dev`, health OK, PipelineManager initialized
 - [x] 3-service architektúra — marketing/dashboard/docs z jedného repo cez SITE_MODE middleware
 - [x] Čisté dashboard URL — `app.kovrin.dev/overview` (nie `/app/overview`)
 
