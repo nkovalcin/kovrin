@@ -30,7 +30,14 @@ class SafetyCritic:
         self._core = constitutional_core
 
     async def evaluate(self, subtask: SubTask, intent_context: str = "") -> list[ProofObligation]:
-        return await self._core.check(subtask, intent_context)
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.critic.safety") as span:
+            span.set_attribute("kovrin.task_id", subtask.id)
+            result = await self._core.check(subtask, intent_context)
+            span.set_attribute("kovrin.passed", self.passed(result))
+            return result
 
     @staticmethod
     def passed(obligations: list[ProofObligation]) -> bool:
@@ -57,6 +64,18 @@ class FeasibilityCritic:
         self._available_tools = available_tools or []
 
     async def evaluate(self, subtask: SubTask, context: dict | None = None) -> ProofObligation:
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.critic.feasibility") as span:
+            span.set_attribute("kovrin.task_id", subtask.id)
+            span.set_attribute("kovrin.tools_count", len(self._available_tools))
+            result = await self._evaluate_inner(subtask, context)
+            span.set_attribute("kovrin.feasible", result.passed)
+            return result
+
+    async def _evaluate_inner(self, subtask: SubTask, context: dict | None = None) -> ProofObligation:
+        """Inner feasibility evaluation logic."""
         tools_section = ""
         if self._available_tools:
             tool_list = ", ".join(self._available_tools)
@@ -144,6 +163,18 @@ class PolicyCritic:
         self._model = model or self.MODEL
 
     async def evaluate(self, subtask: SubTask, constraints: list[str]) -> ProofObligation:
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.critic.policy") as span:
+            span.set_attribute("kovrin.task_id", subtask.id)
+            span.set_attribute("kovrin.constraints_count", len(constraints))
+            result = await self._evaluate_inner(subtask, constraints)
+            span.set_attribute("kovrin.compliant", result.passed)
+            return result
+
+    async def _evaluate_inner(self, subtask: SubTask, constraints: list[str]) -> ProofObligation:
+        """Inner policy evaluation logic."""
         if not constraints:
             return ProofObligation(
                 axiom_id=0,
@@ -234,21 +265,30 @@ class CriticPipeline:
 
         Returns (all_passed, list_of_obligations).
         """
-        # Run safety critic (most important — L0 axioms)
-        safety_obligations = await self.safety.evaluate(subtask, intent_context)
+        from kovrin.observability.tracing import get_tracer
 
-        # Run feasibility and policy in parallel
-        import asyncio
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.critic_pipeline") as span:
+            span.set_attribute("kovrin.task_id", subtask.id)
 
-        feasibility_result, policy_result = await asyncio.gather(
-            self.feasibility.evaluate(subtask, task_context),
-            self.policy.evaluate(subtask, constraints),
-        )
+            # Run safety critic (most important — L0 axioms)
+            safety_obligations = await self.safety.evaluate(subtask, intent_context)
 
-        all_obligations = safety_obligations + [feasibility_result, policy_result]
-        all_passed = all(o.passed for o in all_obligations)
+            # Run feasibility and policy in parallel
+            import asyncio
 
-        return all_passed, all_obligations
+            feasibility_result, policy_result = await asyncio.gather(
+                self.feasibility.evaluate(subtask, task_context),
+                self.policy.evaluate(subtask, constraints),
+            )
+
+            all_obligations = safety_obligations + [feasibility_result, policy_result]
+            all_passed = all(o.passed for o in all_obligations)
+
+            span.set_attribute("kovrin.critics_run", 3)
+            span.set_attribute("kovrin.all_passed", all_passed)
+
+            return all_passed, all_obligations
 
     @staticmethod
     def create_trace(

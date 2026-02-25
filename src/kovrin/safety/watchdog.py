@@ -582,31 +582,43 @@ class WatchdogAgent:
 
     async def _on_event(self, hashed: HashedTrace) -> None:
         """Process a new trace event."""
+        from kovrin.observability.tracing import get_tracer
+
         if self._killed:
             return
 
-        # Check all temporal rules
-        for rule in self.rules:
-            alert = rule.check(hashed, self._history)
-            if alert:
-                self.alerts.append(alert)
-                await self._handle_alert(alert)
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.watchdog_check") as span:
+            span.set_attribute("kovrin.event_type", hashed.trace.event_type)
+            span.set_attribute("kovrin.task_id", hashed.trace.task_id or "")
+            span.set_attribute("kovrin.rules_count", len(self.rules))
 
-        # Check drift detection on EXECUTION_COMPLETE events
-        if (
-            self.enable_drift_detection
-            and self._client
-            and hashed.trace.event_type == "EXECUTION_COMPLETE"
-        ):
-            now = time.monotonic()
-            if now - self._last_drift_check >= self._drift_check_interval:
-                self._last_drift_check = now
-                drift_alert = await self._check_drift(hashed)
-                if drift_alert:
-                    self.alerts.append(drift_alert)
-                    await self._handle_alert(drift_alert)
+            alerts_fired = 0
+            # Check all temporal rules
+            for rule in self.rules:
+                alert = rule.check(hashed, self._history)
+                if alert:
+                    alerts_fired += 1
+                    self.alerts.append(alert)
+                    await self._handle_alert(alert)
 
-        self._history.append(hashed)
+            span.set_attribute("kovrin.alerts_fired", alerts_fired)
+
+            # Check drift detection on EXECUTION_COMPLETE events
+            if (
+                self.enable_drift_detection
+                and self._client
+                and hashed.trace.event_type == "EXECUTION_COMPLETE"
+            ):
+                now = time.monotonic()
+                if now - self._last_drift_check >= self._drift_check_interval:
+                    self._last_drift_check = now
+                    drift_alert = await self._check_drift(hashed)
+                    if drift_alert:
+                        self.alerts.append(drift_alert)
+                        await self._handle_alert(drift_alert)
+
+            self._history.append(hashed)
 
     async def _check_drift(self, event: HashedTrace) -> WatchdogAlert | None:
         """Check if a completed task's result aligns with the original intent.

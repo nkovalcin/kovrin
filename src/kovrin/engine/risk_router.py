@@ -83,6 +83,25 @@ class RiskRouter:
             settings: Optional autonomy settings for runtime overrides.
                       If None, uses the hardcoded routing matrix.
         """
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.risk_route") as span:
+            span.set_attribute("kovrin.task_id", subtask.id)
+            span.set_attribute("kovrin.risk_level", subtask.risk_level.value)
+            span.set_attribute("kovrin.speculation_tier", subtask.speculation_tier.value)
+            profile = settings.profile.value if settings else "DEFAULT"
+            span.set_attribute("kovrin.profile", profile)
+
+            decision = self._route_inner(subtask, settings)
+
+            span.set_attribute("kovrin.action", decision.action.value)
+            return decision
+
+    def _route_inner(
+        self, subtask: SubTask, settings: AutonomySettings | None = None
+    ) -> RoutingDecision:
+        """Inner routing logic — called within OTEL span."""
         key = (subtask.risk_level, subtask.speculation_tier)
         action = self._MATRIX.get(key, RoutingAction.HUMAN_APPROVAL)
 

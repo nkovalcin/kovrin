@@ -41,6 +41,21 @@ class IntentParser:
         Uses structured output parsing to extract sub-tasks
         with dependencies, risk levels, and speculation tiers.
         """
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.intent_parse") as span:
+            span.set_attribute("kovrin.intent_id", intent.id)
+            span.set_attribute("kovrin.intent_text", intent.description[:200])
+            span.set_attribute("kovrin.model", self._model)
+
+            subtasks = await self._parse_inner(intent)
+
+            span.set_attribute("kovrin.subtask_count", len(subtasks))
+            return subtasks
+
+    async def _parse_inner(self, intent: IntentV2) -> list[SubTask]:
+        """Inner parse logic — called within OTEL span."""
         constraints_text = (
             "\n".join(f"  - {c}" for c in intent.constraints) if intent.constraints else "  None"
         )

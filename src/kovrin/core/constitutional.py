@@ -113,9 +113,31 @@ class ConstitutionalCore:
         Returns a list of proof obligations — one per axiom.
         If any obligation fails, the task MUST be rejected.
         """
-        if not self.verify_integrity():
-            raise RuntimeError("CRITICAL: Layer 0 axiom integrity compromised — hash mismatch")
+        from kovrin.observability.tracing import get_tracer
 
+        tracer = get_tracer()
+        with tracer.start_as_current_span("kovrin.constitutional_check") as span:
+            span.set_attribute("kovrin.task_id", subtask.id)
+            span.set_attribute("kovrin.risk_level", subtask.risk_level.value)
+
+            if not self.verify_integrity():
+                span.set_attribute("kovrin.integrity", False)
+                raise RuntimeError("CRITICAL: Layer 0 axiom integrity compromised — hash mismatch")
+            span.set_attribute("kovrin.integrity", True)
+
+            obligations = await self._check_inner(subtask, intent_context)
+
+            passed = all(o.passed for o in obligations)
+            span.set_attribute("kovrin.all_passed", passed)
+            span.set_attribute("kovrin.axioms_checked", len(obligations))
+            failed_names = [o.axiom_name for o in obligations if not o.passed]
+            if failed_names:
+                span.set_attribute("kovrin.failed_axioms", ",".join(failed_names))
+
+            return obligations
+
+    async def _check_inner(self, subtask: SubTask, intent_context: str = "") -> list[ProofObligation]:
+        """Inner check logic — called within OTEL span."""
         axiom_descriptions = "\n".join(
             f"  Axiom {a.id} — {a.name}: {a.description}" for a in AXIOMS
         )
