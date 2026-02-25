@@ -675,19 +675,20 @@ superwork = [
 
 ## Čo chýba pre produkciu
 
-**Fáza 0 — Open Source Launch** ← AKTUÁLNY FOKUS
+**Fáza 0 — Open Source Launch** ✅ KOMPLETNÁ (2026-02-25)
 - [x] Landing page kovrin.dev (hero + waitlist + features + pricing) — `kovrin-web` repo
 - [x] Doména `kovrin.dev` zakúpená
 - [x] Opraviť kovrin-web deploy na Railway (waitlist graceful degradation bez DATABASE_URL)
 - [x] Docs cleanup — 100% presné API ukážky, správne domény (kovrin.dev), aktuálne test counts
 - [x] PEP 440 verzia (`2.0.0a1`) pre PyPI kompatibilitu
 - [x] CHANGELOG.md (Keep a Changelog formát)
-- [ ] `pip install kovrin` na PyPI (build + TestPyPI + publish)
-- [ ] GitHub Release v2.0.0a1
-- [ ] GitHub repo public
-- [ ] DNS verifikácia (kovrin.dev, api.kovrin.dev)
+- [x] `pip install kovrin` na PyPI — `kovrin-2.0.0a1` (whl + sdist, published 2026-02-24)
+- [x] GitHub Release v2.0.0a1 — prerelease, published 2026-02-24
+- [x] GitHub repo public — `github.com/nkovalcin/kovrin`
+- [x] DNS verifikácia — kovrin.dev (200), app.kovrin.dev (200), docs.kovrin.dev (200), api.kovrin.dev (offline — Railway service stopped)
+- [x] 3-service architektúra — marketing/dashboard/docs z jedného repo cez SITE_MODE middleware
+- [x] Čisté dashboard URL — `app.kovrin.dev/overview` (nie `/app/overview`)
 
-> **Stratégia:** Dashboard (app.kovrin.dev) odkladáme na neskôr — fokus je open-source framework + docs + marketing site.
 > **FeasibilityCritic:** V budúcnosti tuning — aktuálne funguje (4/4 PASS), ale pri zložitejších promptoch môže rejected rate byť vysoký. Treba kalibrovať prahové hodnoty a tool capability descriptions.
 
 **Fáza 1 — SuperWork MVP (2-4 týždne)**
@@ -709,7 +710,7 @@ superwork = [
 - [ ] Temporal (durable execution), EventStoreDB, multi-model, OpenTelemetry
 
 **Fáza 4 — SaaS (3-6 mesiacov)**
-- [ ] app.kovrin.dev, team features, SOC 2, marketplace
+- [ ] Team features, multi-tenant, SOC 2, marketplace
 
 **Fáza X — KOVRIN ako AI Operating System (dlhodobá vízia)**
 
