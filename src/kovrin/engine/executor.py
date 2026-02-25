@@ -32,12 +32,14 @@ from kovrin.core.models import (
     TaskStatus,
     Trace,
 )
+from kovrin.engine.pricing import calculate_cost, detect_provider
 from kovrin.engine.risk_router import RiskRouter
 
 if TYPE_CHECKING:
     import asyncio
 
     from kovrin.engine.prm import ProcessRewardModel
+    from kovrin.storage.repository import PipelineRepository
     from kovrin.tools.registry import ToolRegistry
     from kovrin.tools.router import SafeToolRouter
 
@@ -64,6 +66,7 @@ class TaskExecutor:
         tool_registry: ToolRegistry | None = None,
         tool_router: SafeToolRouter | None = None,
         model: str | None = None,
+        repo: PipelineRepository | None = None,
     ):
         self._client = client or anthropic.AsyncAnthropic()
         self._router = risk_router or RiskRouter()
@@ -73,6 +76,7 @@ class TaskExecutor:
         self._prm = prm
         self._tool_registry = tool_registry
         self._tool_router = tool_router
+        self._repo = repo
 
     def update_autonomy_settings(self, settings: AutonomySettings | None) -> None:
         """Update autonomy settings at runtime."""
@@ -177,8 +181,13 @@ If it requires generation, be creative yet precise."""
             task_span.set_attribute("kovrin.risk_level", subtask.risk_level.value)
             task_span.set_attribute("kovrin.model", self._model)
 
+            total_input_tokens = 0
+            total_output_tokens = 0
+
             with measure_task_duration(subtask.id, subtask.risk_level.value):
                 response = await self._client.messages.create(**api_kwargs)
+                total_input_tokens += getattr(response.usage, "input_tokens", 0)
+                total_output_tokens += getattr(response.usage, "output_tokens", 0)
 
                 # Tool use loop: handle tool_use responses with safety-gated execution
                 rounds = 0
@@ -268,8 +277,12 @@ If it requires generation, be creative yet precise."""
 
                     api_kwargs["messages"] = messages
                     response = await self._client.messages.create(**api_kwargs)
+                    total_input_tokens += getattr(response.usage, "input_tokens", 0)
+                    total_output_tokens += getattr(response.usage, "output_tokens", 0)
 
             task_span.set_attribute("kovrin.tool_rounds", rounds)
+            task_span.set_attribute("kovrin.input_tokens", total_input_tokens)
+            task_span.set_attribute("kovrin.output_tokens", total_output_tokens)
 
         # Extract final text result
         result = ""
@@ -286,16 +299,41 @@ If it requires generation, be creative yet precise."""
             risk_level=subtask.risk_level.value,
         )
 
+        cost_usd = calculate_cost(self._model, total_input_tokens, total_output_tokens)
+
         traces.append(
             Trace(
                 intent_id=subtask.parent_intent_id or "",
                 task_id=subtask.id,
                 event_type="EXECUTION_COMPLETE",
                 description=f"Completed: {subtask.description[:60]}",
-                details={"output_length": len(result), "tool_rounds": rounds, "model": self._model},
+                details={
+                    "output_length": len(result),
+                    "tool_rounds": rounds,
+                    "model": self._model,
+                    "input_tokens": total_input_tokens,
+                    "output_tokens": total_output_tokens,
+                    "cost_usd": cost_usd,
+                },
                 risk_level=subtask.risk_level,
             )
         )
+
+        # Persist token usage for cost tracking
+        if self._repo:
+            try:
+                self._repo.save_token_usage(
+                    intent_id=subtask.parent_intent_id or "",
+                    task_id=subtask.id,
+                    model=self._model,
+                    provider=detect_provider(self._model),
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    cost_usd=cost_usd,
+                    event_type="task_execution",
+                )
+            except Exception:
+                pass  # Cost tracking should never break execution
 
         # Optional PRM evaluation
         if self._prm:

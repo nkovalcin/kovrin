@@ -79,7 +79,24 @@ class PipelineRepository:
                 profile TEXT DEFAULT 'DEFAULT',
                 override_matrix TEXT DEFAULT '{}',
                 updated_at TEXT DEFAULT ''
-            )
+            );
+
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                intent_id TEXT NOT NULL,
+                task_id TEXT DEFAULT '',
+                model TEXT DEFAULT '',
+                provider TEXT DEFAULT '',
+                input_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0,
+                cost_usd REAL DEFAULT 0.0,
+                event_type TEXT DEFAULT 'task_execution',
+                timestamp TEXT DEFAULT '',
+                FOREIGN KEY (intent_id) REFERENCES pipelines(intent_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_token_usage_intent ON token_usage(intent_id);
+            CREATE INDEX IF NOT EXISTS idx_token_usage_timestamp ON token_usage(timestamp)
         """)
         self._conn.commit()
 
@@ -324,6 +341,152 @@ class PipelineRepository:
             }
             for row in rows
         ]
+
+    def save_token_usage(
+        self,
+        intent_id: str,
+        task_id: str,
+        model: str,
+        provider: str,
+        input_tokens: int,
+        output_tokens: int,
+        cost_usd: float,
+        event_type: str = "task_execution",
+    ) -> None:
+        """Record token usage for a single LLM call."""
+        self._conn.execute(
+            """INSERT INTO token_usage
+               (intent_id, task_id, model, provider, input_tokens, output_tokens,
+                cost_usd, event_type, timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                intent_id,
+                task_id,
+                model,
+                provider,
+                input_tokens,
+                output_tokens,
+                cost_usd,
+                event_type,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def get_costs(
+        self,
+        period_days: int = 30,
+        intent_id: str | None = None,
+    ) -> dict:
+        """Get cost summary, optionally filtered by intent_id or time period.
+
+        Returns:
+            Dict with total_cost_usd, per_model breakdown, per_pipeline breakdown,
+            and daily_series.
+        """
+        base_where = "WHERE timestamp >= ?"
+        params: list = [
+            (datetime.now(UTC).replace(hour=0, minute=0, second=0)
+             .__class__(datetime.now(UTC).year, datetime.now(UTC).month, datetime.now(UTC).day, tzinfo=UTC)
+             - __import__("datetime").timedelta(days=period_days)).isoformat()
+        ]
+
+        if intent_id:
+            base_where += " AND intent_id = ?"
+            params.append(intent_id)
+
+        # Total
+        row = self._conn.execute(
+            f"""SELECT COALESCE(SUM(cost_usd), 0) as total,
+                       COALESCE(SUM(input_tokens), 0) as input_t,
+                       COALESCE(SUM(output_tokens), 0) as output_t
+                FROM token_usage {base_where}""",
+            tuple(params),
+        ).fetchone()
+
+        total_cost = row["total"] if row else 0.0
+        total_input = row["input_t"] if row else 0
+        total_output = row["output_t"] if row else 0
+
+        # Per model
+        model_rows = self._conn.execute(
+            f"""SELECT model,
+                       SUM(input_tokens) as input_t,
+                       SUM(output_tokens) as output_t,
+                       SUM(cost_usd) as cost,
+                       COUNT(*) as calls
+                FROM token_usage {base_where}
+                GROUP BY model ORDER BY cost DESC""",
+            tuple(params),
+        ).fetchall()
+
+        per_model = {
+            r["model"]: {
+                "input_tokens": r["input_t"],
+                "output_tokens": r["output_t"],
+                "cost_usd": round(r["cost"], 6),
+                "calls": r["calls"],
+            }
+            for r in model_rows
+        }
+
+        # Per pipeline (top 20)
+        pipeline_rows = self._conn.execute(
+            f"""SELECT tu.intent_id,
+                       COALESCE(p.intent, '') as intent,
+                       SUM(tu.input_tokens) as input_t,
+                       SUM(tu.output_tokens) as output_t,
+                       SUM(tu.cost_usd) as cost,
+                       COUNT(*) as calls
+                FROM token_usage tu
+                LEFT JOIN pipelines p ON tu.intent_id = p.intent_id
+                {base_where.replace('timestamp', 'tu.timestamp')}
+                GROUP BY tu.intent_id ORDER BY cost DESC LIMIT 20""",
+            tuple(params),
+        ).fetchall()
+
+        per_pipeline = [
+            {
+                "intent_id": r["intent_id"],
+                "intent": r["intent"],
+                "input_tokens": r["input_t"],
+                "output_tokens": r["output_t"],
+                "cost_usd": round(r["cost"], 6),
+                "calls": r["calls"],
+            }
+            for r in pipeline_rows
+        ]
+
+        # Daily series
+        daily_rows = self._conn.execute(
+            f"""SELECT DATE(timestamp) as day,
+                       SUM(cost_usd) as cost,
+                       SUM(input_tokens) as input_t,
+                       SUM(output_tokens) as output_t
+                FROM token_usage {base_where}
+                GROUP BY DATE(timestamp) ORDER BY day""",
+            tuple(params),
+        ).fetchall()
+
+        daily_series = [
+            {
+                "date": r["day"],
+                "cost_usd": round(r["cost"], 6),
+                "input_tokens": r["input_t"],
+                "output_tokens": r["output_t"],
+            }
+            for r in daily_rows
+        ]
+
+        return {
+            "total_cost_usd": round(total_cost, 6),
+            "total_input_tokens": total_input,
+            "total_output_tokens": total_output,
+            "per_model": per_model,
+            "per_pipeline": per_pipeline,
+            "daily_series": daily_series,
+            "period_days": period_days,
+        }
 
     def close(self) -> None:
         """Close the database connection."""

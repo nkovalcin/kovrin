@@ -100,6 +100,10 @@ class PipelineManager:
             autonomy_settings=self._autonomy_settings,
         )
 
+        # Wire executor to repository for cost tracking
+        if hasattr(self._kovrin, "_executor"):
+            self._kovrin._executor._repo = self._repo
+
     def update_autonomy_settings(self, settings: AutonomySettings) -> None:
         """Update autonomy settings: memory + Kovrin + DB + broadcast."""
         self._autonomy_settings = settings
@@ -681,6 +685,32 @@ async def evaluate_counterfactual(intent_id: str, body: CounterfactualEvalReques
         "diffs": diffs,
         "total_changed": sum(1 for d in diffs if d["changed"]),
     }
+
+
+# ─── Cost Tracking Endpoints ──────────────────────────────────
+
+
+@app.get("/api/costs")
+async def get_costs(period: int = 30, intent_id: str | None = None) -> dict:
+    """Get cost breakdown by model, pipeline, and daily series.
+
+    Args:
+        period: Number of days to look back (default 30).
+        intent_id: Optional filter for a specific pipeline.
+    """
+    m = _require_manager()
+    try:
+        return m._repo.get_costs(period_days=period, intent_id=intent_id)
+    except Exception:
+        return {
+            "total_cost_usd": 0,
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "per_model": {},
+            "per_pipeline": [],
+            "daily_series": [],
+            "period_days": period,
+        }
 
 
 # ─── Phase 6: PRM, Tokens, Topology, Drift Endpoints ────────
