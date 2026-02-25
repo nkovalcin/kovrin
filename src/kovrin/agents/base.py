@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import anthropic
 
 from kovrin.agents.tools import ToolExecutor, create_default_tools
-from kovrin.core.models import AgentInfo, AgentRole, SubTask, Trace
+from kovrin.core.models import AgentInfo, AgentRole, DEFAULT_MODEL_ROUTING, SubTask, Trace
 
 if TYPE_CHECKING:
     from kovrin.tools.router import SafeToolRouter
@@ -60,7 +60,7 @@ class Agent:
     through the Kovrin safety pipeline before execution.
     """
 
-    MODEL = "claude-sonnet-4-6"
+    MODEL = DEFAULT_MODEL_ROUTING["base_agent"].value
 
     def __init__(
         self,

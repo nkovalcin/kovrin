@@ -14,7 +14,7 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from kovrin.core.models import RiskLevel
+from kovrin.core.models import DEFAULT_MODEL_ROUTING, RiskLevel
 from kovrin.superwork.models import (
     ProjectAnalysis,
     TaskCompletionEvent,
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ORCHESTRATOR_MODEL = "claude-opus-4-6"
+ORCHESTRATOR_MODEL = DEFAULT_MODEL_ROUTING["orchestrator"].value
 ANALYSIS_MAX_TOKENS = 4096
 
 SYSTEM_PROMPT = """\

@@ -562,7 +562,7 @@ curl -X POST https://api.kovrin.dev/api/run \
 | Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (10 types) |
 | Structured logging | ✅ Vyriešené | JSON + human-readable via kovrin.logging |
 | FeasibilityCritic false rejections | ✅ Vyriešené | Improved prompt s detailed tool capabilities, explicit eval rules. Verified: 4/4 tasks PASS. |
-| Hardcoded model strings | 🟡 Stredná | ~10 miest s `claude-sonnet-4-20250514` → provider abstrakcia. Nefunkčný bug, len tech debt. |
+| Hardcoded model strings | ✅ Vyriešené | Všetky model stringy používajú `ModelTier` enum a `DEFAULT_MODEL_ROUTING` z `core/models.py`. |
 | Pre-existing API tests (7) | 🟡 Nízka | `test_api.py` testy zlyhávajú bez bežiaceho servera + ANTHROPIC_API_KEY. Skip cez `--ignore`. |
 | kovrin-web deploy na Railway | ✅ Vyriešené | Waitlist má lazy pool initialization — graceful degradation bez `DATABASE_URL`. Pre plný waitlist treba Railway Postgres. `KOVRIN_API_INTERNAL_URL` treba pre proxy routes. |
 | `dashboard/` v kovrin repo je zastaraný | 🟡 Stredná | Starý Vite+React prototyp. Produkčný frontend je v `kovrin-web/` repo. Zvážiť odstránenie alebo archív. |
@@ -789,7 +789,7 @@ Platforma: Web app (Next.js) → Desktop (Tauri) → Mouse-less AI workspace.
 6. 🟡 **End-to-end SuperWork pipeline test** — posledný item Fázy 1
 7. 🟡 **SuperWork UI doladenie** — UX nie je ešte kompletné
 8. 🟢 **Test coverage** — Každá public metóda má testy
-9. 🟢 **Hardcoded model strings** — ~10 miest → provider abstrakcia
+9. ✅ ~~Hardcoded model strings~~ — Vyriešené (ModelTier + DEFAULT_MODEL_ROUTING)
 10. 🔵 **Fáza 2** — Native Mac App (Tauri)
 
 ---

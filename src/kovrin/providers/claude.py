@@ -18,6 +18,7 @@ from typing import Any
 
 import anthropic
 
+from kovrin.core.models import DEFAULT_MODEL_ROUTING
 from kovrin.providers.base import (
     ContentBlock,
     LLMProvider,
@@ -34,7 +35,7 @@ class ClaudeProvider(LLMProvider):
     Falls back to ANTHROPIC_API_KEY env var if no key provided.
     """
 
-    DEFAULT_MODEL = "claude-sonnet-4-6"
+    DEFAULT_MODEL = DEFAULT_MODEL_ROUTING["task_executor"].value
 
     def __init__(
         self,

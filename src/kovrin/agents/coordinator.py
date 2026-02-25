@@ -17,7 +17,7 @@ import anthropic
 
 from kovrin.agents.base import Agent
 from kovrin.agents.registry import AgentRegistry
-from kovrin.core.models import AgentRole, DelegationScope, SubTask, Trace
+from kovrin.core.models import AgentRole, DEFAULT_MODEL_ROUTING, DelegationScope, SubTask, Trace
 
 if TYPE_CHECKING:
     from kovrin.engine.tokens import DelegationToken, TokenAuthority
@@ -173,7 +173,7 @@ class AgentCoordinator:
         # No agent found — use fallback generic execution
         if self._client:
             response = await self._client.messages.create(
-                model="claude-sonnet-4-6",
+                model=DEFAULT_MODEL_ROUTING["base_agent"].value,
                 max_tokens=4096,
                 messages=[
                     {

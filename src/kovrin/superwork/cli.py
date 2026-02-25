@@ -51,13 +51,16 @@ def main() -> None:
     )
     @click.option(
         "--model",
-        default="claude-opus-4-6",
-        help="Claude model for the Orchestrator Agent.",
+        default=None,
+        help="Claude model for the Orchestrator Agent. Defaults to Opus.",
     )
-    def superwork(project: str, database_url: str | None, model: str) -> None:
+    def superwork(project: str, database_url: str | None, model: str | None) -> None:
         """Start the Kovrin SuperWork supervisor."""
+        from kovrin.core.models import DEFAULT_MODEL_ROUTING
+
         db_url = database_url or os.environ.get("DATABASE_URL", "kovrin.db")
-        asyncio.run(_run_superwork(project, db_url, model))
+        resolved_model = model or DEFAULT_MODEL_ROUTING["orchestrator"].value
+        asyncio.run(_run_superwork(project, db_url, resolved_model))
 
     superwork()
 
