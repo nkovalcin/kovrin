@@ -176,7 +176,11 @@ class PipelineManager:
         return False
 
     async def start_pipeline(self, request: RunRequest) -> str:
-        """Start a new pipeline and return its intent_id."""
+        """Start a new pipeline and return its intent_id.
+
+        When TEMPORAL_ADDRESS is set, dispatches to Temporal workflow.
+        Otherwise, runs with asyncio.create_task (default).
+        """
         from kovrin.intent.schema import IntentV2
 
         intent_obj = IntentV2.simple(
@@ -186,12 +190,71 @@ class PipelineManager:
         )
         intent_id = intent_obj.id
 
+        # Temporal mode: dispatch workflow instead of asyncio task
+        temporal_addr = os.environ.get("TEMPORAL_ADDRESS")
+        if temporal_addr:
+            try:
+                from temporalio.client import Client
+
+                from kovrin.workflows.pipeline_workflow import (
+                    TASK_QUEUE,
+                    PipelineInput,
+                    _get_workflow_class,
+                )
+
+                async def _run_temporal():
+                    client = await Client.connect(
+                        temporal_addr,
+                        namespace=os.environ.get("TEMPORAL_NAMESPACE", "default"),
+                    )
+                    PipelineWorkflow = _get_workflow_class()
+                    result = await client.execute_workflow(
+                        PipelineWorkflow.run,
+                        PipelineInput(
+                            intent=request.intent,
+                            constraints=request.constraints,
+                            context=request.context,
+                        ),
+                        id=f"pipeline-{intent_id}",
+                        task_queue=os.environ.get("TEMPORAL_TASK_QUEUE", TASK_QUEUE),
+                    )
+                    # Store result for API retrieval
+                    self._results[intent_id] = ExecutionResult(
+                        intent_id=intent_id,
+                        success=result.success,
+                        output=result.output,
+                    )
+                    await self._broadcast({
+                        "type": "pipeline_complete",
+                        "intent_id": intent_id,
+                        "success": result.success,
+                    })
+
+                task = asyncio.create_task(_run_temporal())
+                self._running[intent_id] = task
+                return intent_id
+            except ImportError:
+                pass  # Fall back to direct execution
+
         task = asyncio.create_task(self._run(intent_id, request))
         self._running[intent_id] = task
         return intent_id
 
     async def _run(self, intent_id: str, request: RunRequest) -> None:
-        trace_log = ImmutableTraceLog()
+        # Use PersistentTraceLog if EventStoreDB is configured
+        trace_log: ImmutableTraceLog
+        try:
+            from kovrin.audit.persistent_trace_log import PersistentTraceLog
+            from kovrin.storage.eventstore import EventStoreClient
+
+            es_client = EventStoreClient.from_env()
+            if es_client:
+                trace_log = PersistentTraceLog(es_client, intent_id=intent_id)
+            else:
+                trace_log = ImmutableTraceLog()
+        except ImportError:
+            trace_log = ImmutableTraceLog()
+
         hashed_trace_data: list[dict] = []
 
         async def _on_trace(hashed: HashedTrace) -> None:
@@ -318,6 +381,25 @@ _init_error: str | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global manager, _init_error
+
+    # Initialize OpenTelemetry (no-op if OTEL_EXPORTER_OTLP_ENDPOINT not set)
+    try:
+        from kovrin.observability.tracing import init_tracing
+
+        if init_tracing():
+            print("[kovrin] OpenTelemetry tracing initialized")
+
+            # Add FastAPI instrumentation if available
+            try:
+                from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+                FastAPIInstrumentor.instrument_app(app)
+                print("[kovrin] FastAPI OTEL instrumentation active")
+            except ImportError:
+                pass
+    except ImportError:
+        pass
+
     try:
         manager = PipelineManager()
         print("[kovrin] PipelineManager initialized successfully")
@@ -325,7 +407,16 @@ async def lifespan(app: FastAPI):
         _init_error = f"{type(e).__name__}: {e}"
         print(f"[kovrin] PipelineManager init FAILED: {_init_error}")
         print("[kovrin] Server running in degraded mode — core endpoints will return 503")
+
     yield
+
+    # Shutdown OTEL
+    try:
+        from kovrin.observability.tracing import shutdown
+
+        shutdown()
+    except ImportError:
+        pass
 
 
 app = FastAPI(

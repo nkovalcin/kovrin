@@ -1,0 +1,116 @@
+# Kovrin — Local Development Stack
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f kovrin-api
+#
+# Services:
+#   - kovrin-api:     FastAPI backend (port 8000)
+#   - kovrin-worker:  Temporal worker (picks up workflows)
+#   - temporal:       Temporal server (port 7233, UI on 8233)
+#   - postgres:       PostgreSQL for Temporal persistence
+#   - eventstore:     EventStoreDB (port 2113, UI on 2113)
+#   - jaeger:         Jaeger tracing UI (port 16686)
+
+services:
+  # ── Infrastructure ─────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres
+    ports:
+      - "7233:7233"   # gRPC
+      - "8233:8233"   # Temporal UI
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  eventstore:
+    image: eventstore/eventstore:lts
+    environment:
+      EVENTSTORE_CLUSTER_SIZE: 1
+      EVENTSTORE_RUN_PROJECTIONS: All
+      EVENTSTORE_START_STANDARD_PROJECTIONS: "true"
+      EVENTSTORE_INSECURE: "true"
+    ports:
+      - "2113:2113"   # HTTP + UI + gRPC
+    volumes:
+      - eventstore_data:/var/lib/eventstore
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+
+  # ── Kovrin Services ────────────────────────────────────────
+
+  kovrin-api:
+    build: .
+    depends_on:
+      - eventstore
+      - jaeger
+    ports:
+      - "8000:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      EVENTSTORE_URL: "esdb://eventstore:2113?tls=false"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      OTEL_SERVICE_NAME: "kovrin-api"
+      TEMPORAL_ADDRESS: "temporal:7233"
+      TEMPORAL_NAMESPACE: "default"
+      TEMPORAL_TASK_QUEUE: "kovrin-pipeline"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kovrin-worker:
+    build: .
+    command: python -m kovrin.workflows.worker
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      TEMPORAL_ADDRESS: "temporal:7233"
+      TEMPORAL_NAMESPACE: "default"
+      TEMPORAL_TASK_QUEUE: "kovrin-pipeline"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
+      OTEL_SERVICE_NAME: "kovrin-worker"
+
+volumes:
+  postgres_data:
+  eventstore_data:

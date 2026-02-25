@@ -64,6 +64,18 @@ cli = [
     "click>=8.0",
     "rich>=13.0",
 ]
+otel = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp>=1.20",
+    "opentelemetry-instrumentation-fastapi>=0.44b0",
+]
+eventstore = [
+    "esdbclient>=1.0",
+]
+temporal = [
+    "temporalio>=1.7",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
@@ -73,8 +85,11 @@ dev = [
     "ruff>=0.5",
     "pytest-cov>=5.0",
 ]
+production = [
+    "kovrin[api,otel,eventstore,temporal]",
+]
 all = [
-    "kovrin[api,openai,superwork,cli]",
+    "kovrin[api,openai,superwork,cli,otel,eventstore,temporal]",
 ]
 
 [project.scripts]

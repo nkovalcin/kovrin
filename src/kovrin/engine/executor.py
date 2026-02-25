@@ -140,6 +140,12 @@ Execute this task thoroughly and provide a clear, structured result.
 Focus on quality and accuracy. If the task requires analysis, be specific.
 If it requires generation, be creative yet precise."""
 
+        # OTEL tracing
+        from kovrin.observability.metrics import measure_task_duration, record_task_complete, record_tool_call
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+
         # Execute via Claude API
         subtask.status = TaskStatus.EXECUTING
         traces.append(
@@ -166,84 +172,104 @@ If it requires generation, be creative yet precise."""
             if tool_schemas:
                 api_kwargs["tools"] = tool_schemas
 
-        response = await self._client.messages.create(**api_kwargs)
+        with tracer.start_as_current_span("kovrin.task_execute") as task_span:
+            task_span.set_attribute("kovrin.task_id", subtask.id)
+            task_span.set_attribute("kovrin.risk_level", subtask.risk_level.value)
+            task_span.set_attribute("kovrin.model", self._model)
 
-        # Tool use loop: handle tool_use responses with safety-gated execution
-        rounds = 0
-        while (
-            response.stop_reason == "tool_use"
-            and self._tool_router
-            and self._tool_registry
-            and rounds < MAX_TOOL_ROUNDS
-        ):
-            rounds += 1
+            with measure_task_duration(subtask.id, subtask.risk_level.value):
+                response = await self._client.messages.create(**api_kwargs)
 
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    from kovrin.tools.models import ToolCallRequest
+                # Tool use loop: handle tool_use responses with safety-gated execution
+                rounds = 0
+                while (
+                    response.stop_reason == "tool_use"
+                    and self._tool_router
+                    and self._tool_registry
+                    and rounds < MAX_TOOL_ROUNDS
+                ):
+                    rounds += 1
 
-                    request = ToolCallRequest(
-                        tool_name=block.name,
-                        tool_input=block.input,
-                        tool_use_id=block.id,
-                        task_id=subtask.id,
-                        intent_id=subtask.parent_intent_id or "",
-                    )
+                    tool_results = []
+                    for block in response.content:
+                        if block.type == "tool_use":
+                            from kovrin.tools.models import ToolCallRequest
 
-                    # Route through safety pipeline
-                    decision = await self._tool_router.evaluate(request)
+                            request = ToolCallRequest(
+                                tool_name=block.name,
+                                tool_input=block.input,
+                                tool_use_id=block.id,
+                                task_id=subtask.id,
+                                intent_id=subtask.parent_intent_id or "",
+                            )
 
-                    if decision.allowed:
-                        tool_result = await self._tool_router.execute_if_allowed(request, decision)
-                    else:
-                        from kovrin.agents.tools import ToolResult
+                            # Route through safety pipeline
+                            with tracer.start_as_current_span("kovrin.tool_call") as tool_span:
+                                tool_span.set_attribute("kovrin.tool_name", block.name)
+                                decision = await self._tool_router.evaluate(request)
+                                tool_span.set_attribute("kovrin.tool_allowed", decision.allowed)
+                                tool_span.set_attribute("kovrin.tool_risk", decision.risk_level.value)
 
-                        tool_result = ToolResult(
-                            tool_use_id=block.id,
-                            content=f"[BLOCKED BY SAFETY] {decision.reason}",
-                            is_error=True,
-                        )
+                                if decision.allowed:
+                                    tool_result = await self._tool_router.execute_if_allowed(
+                                        request, decision
+                                    )
+                                else:
+                                    from kovrin.agents.tools import ToolResult
 
-                    tool_results.append(tool_result)
+                                    tool_result = ToolResult(
+                                        tool_use_id=block.id,
+                                        content=f"[BLOCKED BY SAFETY] {decision.reason}",
+                                        is_error=True,
+                                    )
 
-                    traces.append(
-                        Trace(
-                            intent_id=subtask.parent_intent_id or "",
-                            task_id=subtask.id,
-                            event_type="TOOL_CALL",
-                            description=f"Tool '{block.name}' → {decision.action.value}",
-                            details={
-                                "tool": block.name,
-                                "allowed": decision.allowed,
-                                "action": decision.action.value,
-                                "risk_level": decision.risk_level.value,
-                                "result_preview": tool_result.content[:200],
-                                "is_error": tool_result.is_error,
-                            },
-                            risk_level=decision.risk_level,
-                        )
-                    )
+                            record_tool_call(
+                                tool_name=block.name,
+                                allowed=decision.allowed,
+                                risk_level=decision.risk_level.value,
+                            )
 
-            # Add assistant response + tool results to messages
-            messages.append({"role": "assistant", "content": response.content})
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
+                            tool_results.append(tool_result)
+
+                            traces.append(
+                                Trace(
+                                    intent_id=subtask.parent_intent_id or "",
+                                    task_id=subtask.id,
+                                    event_type="TOOL_CALL",
+                                    description=f"Tool '{block.name}' → {decision.action.value}",
+                                    details={
+                                        "tool": block.name,
+                                        "allowed": decision.allowed,
+                                        "action": decision.action.value,
+                                        "risk_level": decision.risk_level.value,
+                                        "result_preview": tool_result.content[:200],
+                                        "is_error": tool_result.is_error,
+                                    },
+                                    risk_level=decision.risk_level,
+                                )
+                            )
+
+                    # Add assistant response + tool results to messages
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append(
                         {
-                            "type": "tool_result",
-                            "tool_use_id": tr.tool_use_id,
-                            "content": tr.content,
-                            "is_error": tr.is_error,
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": tr.tool_use_id,
+                                    "content": tr.content,
+                                    "is_error": tr.is_error,
+                                }
+                                for tr in tool_results
+                            ],
                         }
-                        for tr in tool_results
-                    ],
-                }
-            )
+                    )
 
-            api_kwargs["messages"] = messages
-            response = await self._client.messages.create(**api_kwargs)
+                    api_kwargs["messages"] = messages
+                    response = await self._client.messages.create(**api_kwargs)
+
+            task_span.set_attribute("kovrin.tool_rounds", rounds)
 
         # Extract final text result
         result = ""
@@ -253,6 +279,12 @@ If it requires generation, be creative yet precise."""
 
         subtask.status = TaskStatus.COMPLETED
         subtask.output = result
+
+        record_task_complete(
+            task_id=subtask.id,
+            success=True,
+            risk_level=subtask.risk_level.value,
+        )
 
         traces.append(
             Trace(

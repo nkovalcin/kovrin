@@ -296,6 +296,10 @@ class Kovrin:
             trace_log: Optional external trace log (e.g., from API server for streaming).
                        If None, a fresh ImmutableTraceLog is created.
         """
+        from kovrin.observability.tracing import get_tracer
+
+        tracer = get_tracer()
+
         if trace_log is None:
             trace_log = ImmutableTraceLog()
 
@@ -312,11 +316,30 @@ class Kovrin:
             )
             await self._watchdog.start(trace_log, intent)
 
-        try:
-            return await self._run_pipeline(intent, constraints, context, trace_log)
-        finally:
-            if self._watchdog:
-                await self._watchdog.stop()
+        with tracer.start_as_current_span("kovrin.pipeline") as span:
+            span.set_attribute("kovrin.intent", intent[:200])
+            span.set_attribute("kovrin.watchdog", self._watchdog_enabled)
+            span.set_attribute("kovrin.agents", self._agents_enabled)
+            span.set_attribute("kovrin.tools", self._tools_enabled)
+            try:
+                result = await self._run_pipeline(intent, constraints, context, trace_log)
+                span.set_attribute("kovrin.success", result.success)
+                span.set_attribute("kovrin.task_count", len(result.sub_tasks))
+
+                from kovrin.observability.metrics import record_pipeline_complete
+
+                record_pipeline_complete(
+                    intent_id=result.intent_id,
+                    success=result.success,
+                    task_count=len(result.sub_tasks),
+                )
+                return result
+            except Exception as exc:
+                span.record_exception(exc)
+                raise
+            finally:
+                if self._watchdog:
+                    await self._watchdog.stop()
 
     async def _run_pipeline(
         self,
