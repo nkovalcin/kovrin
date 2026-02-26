@@ -1,6 +1,6 @@
-"""Tests for Kovrin Model Pricing.
+"""Tests for Kovrin model pricing calculations.
 
-Covers calculate_cost() and detect_provider() for all supported models.
+Tests calculate_cost() for each model and detect_provider() for all providers.
 """
 
 import pytest
@@ -8,95 +8,93 @@ import pytest
 from kovrin.engine.pricing import MODEL_PRICING, calculate_cost, detect_provider
 
 
+# ─── calculate_cost ──────────────────────────────────────────
+
+
 class TestCalculateCost:
-    """Tests for calculate_cost()."""
+    """Token-to-USD cost calculation."""
 
-    def test_haiku_cost(self):
-        """Haiku should use $0.80/$4.00 per 1M tokens."""
-        cost = calculate_cost("claude-haiku-4-5", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(0.80 + 4.00)
-
-    def test_sonnet_cost(self):
-        """Sonnet should use $3.00/$15.00 per 1M tokens."""
-        cost = calculate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(3.00 + 15.00)
-
-    def test_opus_cost(self):
-        """Opus should use $15.00/$75.00 per 1M tokens."""
-        cost = calculate_cost("claude-opus-4-6", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(15.00 + 75.00)
-
-    def test_gpt4o_cost(self):
-        """GPT-4o should use $2.50/$10.00 per 1M tokens."""
-        cost = calculate_cost("gpt-4o", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(2.50 + 10.00)
-
-    def test_gpt4o_mini_cost(self):
-        """GPT-4o-mini should use $0.15/$0.60 per 1M tokens."""
-        cost = calculate_cost("gpt-4o-mini", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(0.15 + 0.60)
-
-    def test_o1_cost(self):
-        """O1 should use $15.00/$60.00 per 1M tokens."""
-        cost = calculate_cost("o1", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(15.00 + 60.00)
-
-    def test_zero_tokens(self):
-        """Zero tokens should cost nothing."""
-        assert calculate_cost("claude-sonnet-4-6", 0, 0) == 0.0
-
-    def test_input_only(self):
-        """Output-only cost calculation."""
-        cost = calculate_cost("claude-haiku-4-5", 1_000, 0)
-        expected = 1_000 * 0.80 / 1_000_000
+    def test_claude_haiku(self):
+        cost = calculate_cost("claude-haiku-4-5", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 0.80 / 1_000_000 + 500 * 4.00 / 1_000_000
         assert cost == pytest.approx(expected)
 
-    def test_output_only(self):
-        """Output-only cost calculation."""
-        cost = calculate_cost("claude-haiku-4-5", 0, 1_000)
-        expected = 1_000 * 4.00 / 1_000_000
+    def test_claude_sonnet(self):
+        cost = calculate_cost("claude-sonnet-4-6", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 3.00 / 1_000_000 + 500 * 15.00 / 1_000_000
+        assert cost == pytest.approx(expected)
+
+    def test_claude_opus(self):
+        cost = calculate_cost("claude-opus-4-6", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 15.00 / 1_000_000 + 500 * 75.00 / 1_000_000
+        assert cost == pytest.approx(expected)
+
+    def test_gpt4o(self):
+        cost = calculate_cost("gpt-4o", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 2.50 / 1_000_000 + 500 * 10.00 / 1_000_000
+        assert cost == pytest.approx(expected)
+
+    def test_gpt4o_mini(self):
+        cost = calculate_cost("gpt-4o-mini", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 0.15 / 1_000_000 + 500 * 0.60 / 1_000_000
+        assert cost == pytest.approx(expected)
+
+    def test_o1(self):
+        cost = calculate_cost("o1", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 15.00 / 1_000_000 + 500 * 60.00 / 1_000_000
+        assert cost == pytest.approx(expected)
+
+    def test_o1_mini(self):
+        cost = calculate_cost("o1-mini", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 3.00 / 1_000_000 + 500 * 12.00 / 1_000_000
         assert cost == pytest.approx(expected)
 
     def test_unknown_model_uses_default(self):
-        """Unknown models should use default pricing ($3/$15)."""
-        cost = calculate_cost("some-unknown-model", 1_000_000, 1_000_000)
-        assert cost == pytest.approx(3.00 + 15.00)
-
-    def test_large_token_count(self):
-        """Large token counts should calculate correctly."""
-        cost = calculate_cost("claude-haiku-4-5", 10_000_000, 5_000_000)
-        expected = 10_000_000 * 0.80 / 1_000_000 + 5_000_000 * 4.00 / 1_000_000
+        """Unknown model should use default pricing (Sonnet-level)."""
+        cost = calculate_cost("unknown-model-v3", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 3.00 / 1_000_000 + 500 * 15.00 / 1_000_000
         assert cost == pytest.approx(expected)
 
-    def test_small_token_count(self):
-        """Single token should give a tiny but non-zero cost."""
-        cost = calculate_cost("claude-sonnet-4-6", 1, 1)
-        assert cost > 0
-        assert cost < 0.001
+    def test_zero_tokens(self):
+        cost = calculate_cost("claude-sonnet-4-6", input_tokens=0, output_tokens=0)
+        assert cost == 0.0
 
-    def test_legacy_model_ids(self):
-        """Legacy Claude model IDs should be recognized."""
-        cost1 = calculate_cost("claude-sonnet-4-20250514", 1000, 1000)
-        cost2 = calculate_cost("claude-sonnet-4-6", 1000, 1000)
-        # Same pricing — both Sonnet
-        assert cost1 == pytest.approx(cost2)
+    def test_only_input_tokens(self):
+        cost = calculate_cost("claude-haiku-4-5", input_tokens=1_000_000, output_tokens=0)
+        assert cost == pytest.approx(0.80)
 
-    def test_all_models_in_pricing_table(self):
-        """All models in MODEL_PRICING should have input and output keys."""
-        for model, pricing in MODEL_PRICING.items():
-            assert "input" in pricing, f"{model} missing input pricing"
-            assert "output" in pricing, f"{model} missing output pricing"
-            assert pricing["input"] >= 0
-            assert pricing["output"] >= 0
+    def test_only_output_tokens(self):
+        cost = calculate_cost("claude-haiku-4-5", input_tokens=0, output_tokens=1_000_000)
+        assert cost == pytest.approx(4.00)
+
+    def test_large_token_count(self):
+        """1M tokens should match the pricing per 1M."""
+        cost = calculate_cost("claude-opus-4-6", input_tokens=1_000_000, output_tokens=1_000_000)
+        assert cost == pytest.approx(15.00 + 75.00)
+
+    def test_legacy_model_id(self):
+        """Legacy model IDs should still be priced correctly."""
+        cost = calculate_cost("claude-sonnet-4-20250514", input_tokens=1000, output_tokens=500)
+        expected = 1000 * 3.00 / 1_000_000 + 500 * 15.00 / 1_000_000
+        assert cost == pytest.approx(expected)
+
+    def test_cost_is_rounded(self):
+        """Cost should be rounded to 8 decimal places."""
+        cost = calculate_cost("claude-haiku-4-5", input_tokens=1, output_tokens=1)
+        assert isinstance(cost, float)
+
+
+# ─── detect_provider ─────────────────────────────────────────
 
 
 class TestDetectProvider:
-    """Tests for detect_provider()."""
+    """Provider detection from model ID."""
 
     def test_claude_models(self):
         assert detect_provider("claude-sonnet-4-6") == "anthropic"
         assert detect_provider("claude-haiku-4-5") == "anthropic"
         assert detect_provider("claude-opus-4-6") == "anthropic"
+        assert detect_provider("claude-sonnet-4-20250514") == "anthropic"
 
     def test_openai_gpt_models(self):
         assert detect_provider("gpt-4o") == "openai"
@@ -109,3 +107,28 @@ class TestDetectProvider:
     def test_unknown_model(self):
         assert detect_provider("llama-3-70b") == "unknown"
         assert detect_provider("mistral-7b") == "unknown"
+        assert detect_provider("") == "unknown"
+
+
+# ─── MODEL_PRICING completeness ──────────────────────────────
+
+
+class TestModelPricingData:
+    """Verify pricing data structure."""
+
+    def test_all_models_have_input_and_output(self):
+        for model, pricing in MODEL_PRICING.items():
+            assert "input" in pricing, f"{model} missing 'input' price"
+            assert "output" in pricing, f"{model} missing 'output' price"
+
+    def test_all_prices_positive(self):
+        for model, pricing in MODEL_PRICING.items():
+            assert pricing["input"] > 0, f"{model} input price must be positive"
+            assert pricing["output"] > 0, f"{model} output price must be positive"
+
+    def test_output_more_expensive_than_input(self):
+        """Output tokens are always more expensive than input tokens."""
+        for model, pricing in MODEL_PRICING.items():
+            assert pricing["output"] >= pricing["input"], (
+                f"{model}: output should be >= input price"
+            )

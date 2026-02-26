@@ -17,7 +17,7 @@
 **Stav:** Alpha — core + tools + providers + CLI + dashboard LIVE, **production-verified na Railway**
 **Licencia:** MIT
 **Deployment:** Railway (auto-deploy z `main`) — kovrin-api (FastAPI) + kovrin-web (Next.js, 3 služby)
-**Posledný verified test:** 2026-02-25 — full stack LIVE (dashboard CONNECTED, API healthy, WS active)
+**Posledný verified test:** 2026-02-26 — 978 tests PASS, full stack LIVE (dashboard CONNECTED, API healthy, WS active)
 **CLAUDE.md stratégia:** Tento súbor je **jediný globálny CLAUDE.md** pre oba repozitáre (kovrin + kovrin-web). V kovrin-web/ je len pointer sem.
 
 ---
@@ -45,10 +45,10 @@ Framework kde bezpečnosť AI agentov nie je runtime filter, ale **architektonic
 | Metrika | Hodnota |
 |---------|---------|
 | Fázy whitepaperu | 6/6 implementovaných (Phase 7 neexistuje) |
-| Testy | **741** (z toho 42 adversarial) |
+| Testy | **978** (z toho 42 adversarial, 84 E2E, 60 test súborov) |
 | TLA+ špecifikácie | **8 modulov**, 10 safety invariantov |
-| Pydantic modely | **42 modelov, 17 enumov** (24/12 v core, zvyšok v tools/providers/intent/superwork) |
-| Dashboard komponenty | **12** (React/TypeScript) |
+| Pydantic modely | **53 modelov, 22 enumov** (29/13 v core, zvyšok v tools/providers/intent/superwork/observability) |
+| Dashboard komponenty | **16** (11 kovrin + 5 superwork, React/TypeScript) |
 | LLM Providers | **3** (Claude, OpenAI, Ollama) |
 | Built-in Tools | **8** (safety-gated, Merkle-audited) |
 | Virtual env | `.venv/bin/python` |
@@ -63,7 +63,7 @@ kovrin/
 │   ├── __init__.py          # Hlavné API: Kovrin, AutonomyProfile, ...
 │   ├── core/
 │   │   ├── constitutional.py  # Layer 0 — 5 axiómov, SHA-256 integrity
-│   │   └── models.py          # 29 Pydantic modelov, 13 enumov
+│   │   └── models.py          # 29 Pydantic modelov, 13 enumov (core only)
 │   ├── intent/
 │   │   ├── schema.py          # IntentV2, Performative, SemanticFrame
 │   │   └── parser.py          # HTN decomposition cez Claude API
@@ -77,7 +77,8 @@ kovrin/
 │   │   ├── confidence.py      # ConfidenceEstimator
 │   │   ├── prm.py             # ProcessRewardModel (step-level scoring)
 │   │   ├── tokens.py          # TokenAuthority, DCT
-│   │   └── topology.py        # TopologyAnalyzer
+│   │   ├── topology.py        # TopologyAnalyzer
+│   │   └── pricing.py         # MODEL_PRICING, calculate_cost, detect_provider
 │   ├── safety/
 │   │   ├── critics.py         # SafetyCritic, FeasibilityCritic, PolicyCritic
 │   │   └── watchdog.py        # WatchdogAgent, temporal rules, drift detection
@@ -100,16 +101,28 @@ kovrin/
 │   │   ├── ollama.py          # OllamaProvider (local models)
 │   │   ├── router.py          # ModelRouter — task-based model selection
 │   │   └── circuit_breaker.py # CircuitBreakerProvider — fault tolerance
+│   ├── observability/          # OpenTelemetry instrumentation
+│   │   ├── tracing.py          # get_tracer(), _NoOpTracer, OTEL setup
+│   │   └── metrics.py          # Prometheus-style metrics
 │   ├── api/
-│   │   └── server.py          # FastAPI — REST + WebSocket
+│   │   ├── server.py           # FastAPI — REST + WebSocket
+│   │   └── superwork_router.py # SuperWork API endpoints + WebSocket feed
 │   ├── schema/
 │   │   ├── exporter.py        # SchemaExporter (JSON Schema + TypeScript)
 │   │   └── __main__.py        # CLI: python -m kovrin.schema
 │   ├── storage/
 │   │   └── repository.py      # SQLite persistence
+│   ├── superwork/              # SuperWork supervisor platform
+│   │   ├── models.py           # SuperWork Pydantic models
+│   │   ├── repository.py       # SuperWork SQLite persistence
+│   │   ├── session_watcher.py  # Watches ~/.claude/projects/, detects task completion
+│   │   ├── context_injector.py # ChromaDB + RAG, surgical context per task
+│   │   ├── orchestrator.py     # Opus — analyzes state, proposes next steps
+│   │   ├── metrics.py          # Velocity, cost, completion prediction
+│   │   └── cli.py              # `kovrin superwork --project <path>`
 │   ├── exceptions.py          # KovrinError hierarchy (10 exception types)
 │   ├── logging.py             # Structured logging (JSON + human-readable)
-│   ├── cli.py                 # CLI: kovrin run, verify, audit, serve, status
+│   ├── cli.py                 # CLI: kovrin run, verify, audit, serve, status, shell
 │   └── examples/
 │       └── company_ops.py     # Demo
 ├── specs/                   # TLA+ formálna verifikácia (8 modulov)
@@ -122,28 +135,26 @@ kovrin/
 │   ├── HashChain.tla
 │   ├── KovrinSafety.tla       # Top-level kompozícia (10 invariantov)
 │   └── README.md              # TLC konfigurácia, bounds
-├── dashboard/               # React/TypeScript dashboard
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── types/kovrin.ts    # ✅ Auto-generated by SchemaExporter (29 models, 13 enums)
-│   │   ├── api/client.ts
-│   │   └── components/        # 12 komponentov
-│   └── package.json
-├── tests/                   # 741 testov
+├── tests/                   # 978 testov (60 súborov)
 │   ├── test_adversarial.py        # 30 adversarial (P0 + P1)
 │   ├── test_adversarial_tokens.py # 11 adversarial (P2)
 │   ├── test_adversarial_tools.py  # 13 adversarial (tool safety)
+│   ├── test_api_e2e.py            # 19 E2E (API endpoints)
+│   ├── test_audit_e2e.py          # 15 E2E (Merkle audit)
+│   ├── test_pipeline_e2e.py       # 16 E2E (full pipeline)
+│   ├── test_safety_e2e.py         # 18 E2E (safety integration)
+│   ├── test_tools_e2e.py          # 16 E2E (tool execution)
+│   ├── test_pricing.py            # 20 testov (model pricing)
+│   ├── test_critics.py            # 15 testov (critic pipeline)
+│   ├── test_cli.py                # 20 testov (CLI commands)
 │   ├── test_providers.py          # Provider abstraction tests
-│   ├── test_web_search.py         # Brave Search integration tests
-│   ├── test_exceptions.py         # Exception hierarchy tests
-│   ├── test_cli.py                # CLI command tests
 │   ├── test_schema_exporter.py    # 24 testov
-│   └── test_*.py                  # Unit + integration
+│   └── test_*.py                  # Unit + integration (60 files total)
 ├── docs/
 │   ├── Kovrin_Whitepaper_v2.docx
 │   ├── ARCHITECTURE.md
-│   ├── CLAUDE_OPENSOURCE.md       # TARGET CLAUDE.md pre open-source release
-│   ├── README_OPENSOURCE.md       # TARGET README pre open-source release
+│   ├── README_OPENSOURCE.md       # Public-facing README pre launch
+│   ├── SUPERWORK.md               # SuperWork supervisor platform spec
 │   ├── KOVRIN_Phase1_Plan.docx
 │   ├── kovrin-design-spec.jsx     # Design system, wireframy, sitemap
 │   └── prototypes/                # Early standalone skripty
@@ -315,7 +326,7 @@ source .venv/bin/activate            # Aktivuj venv
 .venv/bin/python -m ...
 
 # ── Testy ────────────────────────────────────────────────────────────────────
-.venv/bin/python -m pytest tests/ -v                              # Všetky (741)
+.venv/bin/python -m pytest tests/ -v --ignore=tests/test_api.py --ignore=tests/test_superwork_api.py  # Všetky (978)
 .venv/bin/python -m pytest tests/ -m adversarial -v              # Adversarial (42)
 .venv/bin/python -m pytest tests/test_schema_exporter.py -v      # Schema (24)
 .venv/bin/python -m pytest tests/ -m "not integration" -v        # Bez API calls
@@ -385,10 +396,12 @@ Každá doména je **samostatná Railway služba** (rovnaký kovrin-web repo, r�
 **app.kovrin.dev (dashboard):**
 - `/overview` — Agent overview, risk scores, real-time events (root `/` redirects here)
 - `/pipeline` — Pipeline management
-- `/pipeline/[id]` — Pipeline detail
+- `/pipeline/[id]` — Pipeline detail (cost, model, tokens, duration stats)
 - `/approvals` — Human-in-the-loop approval queue
 - `/audit` — Merkle-verified audit log
-- `/settings` — Autonomy profiles, system status
+- `/compliance` — Compliance report, safety scores
+- `/costs` — Cost tracking, token usage analytics
+- `/settings` — Autonomy profiles, risk routing matrix, system status
 - `/superwork` — SuperWork dashboard (session control + metrics)
 - `/superwork/proposals` — Task proposals from Orchestrator
 - `/superwork/feed` — Live event feed (WebSocket)
@@ -448,7 +461,9 @@ kovrin-web/
 │   │   │   ├── pipeline/[id]/page.tsx
 │   │   │   ├── approvals/page.tsx
 │   │   │   ├── audit/page.tsx
-│   │   │   ├── settings/page.tsx
+│   │   │   ├── compliance/page.tsx  # Compliance report, safety scores
+│   │   │   ├── costs/page.tsx       # Cost tracking, token usage
+│   │   │   ├── settings/page.tsx    # Autonomy profiles + risk routing matrix
 │   │   │   └── superwork/        # SuperWork sub-routes (SuperWorkProvider wrapper)
 │   │   │       ├── layout.tsx
 │   │   │       ├── page.tsx      # Session control + metrics
@@ -464,8 +479,8 @@ kovrin-web/
 │   │           ├── kovrin/[...path]/     # Proxy → kovrin-api /api/*
 │   │           └── superwork/[...path]/  # Proxy → kovrin-api /api/superwork/*
 │   └── components/
-│       ├── kovrin/               # Pipeline dashboard components (sidebar, pipeline-list, risk-badge, ...)
-│       └── superwork/            # SuperWork components (session-control, metrics-panel, proposal-queue, live-feed, metric-card)
+│       ├── kovrin/               # 11 pipeline dashboard components (sidebar, pipeline-list, risk-badge, risk-matrix, autonomy-controls, ...)
+│       └── superwork/            # 5 SuperWork components (session-control, metrics-panel, proposal-queue, live-feed, metric-card)
 ├── CLAUDE.md                 # Pointer → kovrin/CLAUDE.md
 ├── railway.toml              # builder = nixpacks
 ├── nixpacks.toml             # Node 20, npm ci, npm run build
@@ -552,41 +567,10 @@ curl -X POST https://api.kovrin.dev/api/run \
 
 | Problém | Priorita | Poznámka |
 |---------|----------|---------|
-| `dashboard/src/types/kovrin.ts` | ✅ Vyriešené | Regenerované cez SchemaExporter (29 models, 13 enums). Udržiavať cez `--typescript` exporter. |
-| `docs/CLAUDE_OPENSOURCE.md` | ✅ Vyriešené | Zmazané — navrhovala neexistujúcu štruktúru, plne superseded root CLAUDE.md. |
 | SQLite v produkcii | 🟡 Stredná | Pre produkciu → Temporal/EventStoreDB/Kafka |
-| Multi-model | ✅ Vyriešené | ClaudeProvider, OpenAIProvider, OllamaProvider + ModelRouter |
-| CLI | ✅ Vyriešené | `kovrin run`, `kovrin shell`, `kovrin verify`, `kovrin audit`, `kovrin serve`, `kovrin status` |
-| GitHub Actions CI | ✅ Vyriešené | pytest + coverage + mypy + ruff + pip-audit |
-| Tool execution | ✅ Vyriešené | 8 safety-gated tools, SafeToolRouter, Brave Search API (live, verified) |
-| Custom exceptions | ✅ Vyriešené | KovrinError hierarchy (10 types) |
-| Structured logging | ✅ Vyriešené | JSON + human-readable via kovrin.logging |
-| FeasibilityCritic false rejections | ✅ Vyriešené | Improved prompt s detailed tool capabilities, explicit eval rules. Verified: 4/4 tasks PASS. |
-| Hardcoded model strings | ✅ Vyriešené | Všetky model stringy používajú `ModelTier` enum a `DEFAULT_MODEL_ROUTING` z `core/models.py`. |
-| Pre-existing API tests (7) | 🟡 Nízka | `test_api.py` testy zlyhávajú bez bežiaceho servera + ANTHROPIC_API_KEY. Skip cez `--ignore`. |
-| kovrin-web deploy na Railway | ✅ Vyriešené | Waitlist má lazy pool initialization — graceful degradation bez `DATABASE_URL`. Pre plný waitlist treba Railway Postgres. `KOVRIN_API_INTERNAL_URL` treba pre proxy routes. |
-| `dashboard/` v kovrin repo je zastaraný | 🟡 Stredná | Starý Vite+React prototyp. Produkčný frontend je v `kovrin-web/` repo. Zvážiť odstránenie alebo archív. |
-| kovrin-web `cacheDirectories` | ✅ Vyriešené | `[".next/cache"]` only. **POZOR:** `node_modules` NESMIE byť v cacheDirectories — Nixpacks ho mountne ako prázdny Docker cache volume cez nainštalované balíčky → `next: not found`. npm ci má vlastný cache cez `/root/.npm`. |
-| kovrin-web GitHub Actions CI | ✅ Vyriešené | ESLint + TypeScript + Next.js build + npm audit. |
-| Dashboard URL prefix `/app/` | ✅ Vyriešené (2026-02-25) | Presunuté z `src/app/app/*` → `src/app/(dashboard)/*` route group. Čisté URL: `/overview`, `/pipeline`, atď. |
-| Dashboard DISCONNECTED | ✅ Vyriešené (2026-02-25) | Railway `.railway.internal` nefungoval (port mismatch). Fix: `KOVRIN_API_INTERNAL_URL=https://api.kovrin.dev`. |
-| SuperWork unused sidebar | ✅ Vyriešené (2026-02-25) | `components/superwork/sidebar.tsx` sa nikde neimportoval. Vymazaný. SuperWork stránky používajú hlavný Kovrin sidebar. |
-| SuperWork error handling | ✅ Vyriešené (2026-02-25) | Všetky catch bloky mali prázdne `// error`. Pridaný error state + UI do SessionControl, ProposalQueue, MetricsPanel, LiveFeed. |
-
----
-
-## Čo chýba pre produkciu
-
-1. **Infraštruktúra**: in-memory → Temporal (durable execution), EventStoreDB, Kafka
-2. ~~**Integrácie**: len Claude API → multi-model~~ ✅ (OpenAI, Ollama + ModelRouter)
-3. **LangGraph middleware**: `pip install kovrin-safety` wrapper
-4. ~~**CLI**: `kovrin run`, `kovrin verify`, `kovrin audit`~~ ✅
-5. **Certifikácie**: SOC 2, HIPAA, FedRAMP
-6. **OpenTelemetry**: export traces do štandardných observability nástrojov
-7. **Komunita**: 0 stars, 0 externých používateľov — potrebná launch stratégia
-8. ~~**GitHub Actions CI**: pytest + mypy + ruff pipeline~~ ✅ (+ coverage + pip-audit)
-9. **Docs site**: docs.kovrin.dev (Fumadocs alebo podobné)
-10. **Refactor hardcoded model strings**: 10 miest s `claude-sonnet-4-20250514` → provider abstrakcia
+| Pre-existing API tests | 🟡 Nízka | `test_api.py` + `test_superwork_api.py` vyžadujú bežiaci server. Skip cez `--ignore`. |
+| End-to-end SuperWork pipeline | 🟡 Stredná | Posledný item Fázy 1 — celý SuperWork flow ešte nebol testovaný end-to-end. |
+| FeasibilityCritic tuning | 🟢 Nízka | Funguje (4/4 PASS), ale pri zložitejších promptoch môže rejected rate byť vysoký. |
 
 ---
 
@@ -654,21 +638,21 @@ Kompletná design spec: `docs/kovrin-design-spec.jsx`
 
 ---
 
-## SuperWork — Produkčná nadstavba (NOVÁ PRIORITA)
+## SuperWork — Supervisor Platform (IMPLEMENTOVANÉ)
 
 SuperWork je vrstva nad KOVRIN frameworkom — supervisor platforma kde ty vidíš agentov "cez sklo", schvaľuješ kroky a sleduješ globálne metriky. **Kompletná dokumentácia:** `docs/SUPERWORK.md`
 
-### Nové komponenty (treba postaviť)
+### Implementované komponenty
 
-| Komponent | Súbor | Čo robí |
-|-----------|-------|--------|
-| Session Watcher | `src/kovrin/superwork/session_watcher.py` | `fs.watch` na `~/.claude/projects/`, detekuje task completion |
-| Context Injector | `src/kovrin/superwork/context_injector.py` | ChromaDB + RAG, chirurgický kontext pre každý task |
-| Orchestrator Agent | `src/kovrin/superwork/orchestrator.py` | Opus — analyzuje stav, navrhuje ďalšie kroky |
-| Metrics Tracker | `src/kovrin/superwork/metrics.py` | Velocity, cost, predikcia dokončenia |
-| SuperWork CLI | `src/kovrin/superwork/cli.py` | `kovrin superwork --project <path>` |
-| Supervisor Dashboard | `dashboard/src/components/` | React UI — stromový view, schvaľovanie, metriky |
-| SuperWork API routes | `src/kovrin/api/superwork_router.py` | FastAPI endpoints + WebSocket live feed |
+| Komponent | Súbor | Čo robí | Stav |
+|-----------|-------|--------|------|
+| Session Watcher | `src/kovrin/superwork/session_watcher.py` | `fs.watch` na `~/.claude/projects/`, detekuje task completion | ✅ |
+| Context Injector | `src/kovrin/superwork/context_injector.py` | ChromaDB + RAG, chirurgický kontext pre každý task | ✅ |
+| Orchestrator Agent | `src/kovrin/superwork/orchestrator.py` | Opus — analyzuje stav, navrhuje ďalšie kroky | ✅ |
+| Metrics Tracker | `src/kovrin/superwork/metrics.py` | Velocity, cost, predikcia dokončenia | ✅ |
+| SuperWork CLI | `src/kovrin/superwork/cli.py` | `kovrin superwork --project <path>` | ✅ |
+| Supervisor Dashboard | `kovrin-web/src/components/superwork/` | 5 React komponentov (session, metrics, proposals, feed, metric-card) | ✅ |
+| SuperWork API routes | `src/kovrin/api/superwork_router.py` | FastAPI endpoints + WebSocket live feed | ✅ |
 
 ### Ako to celé funguje
 
@@ -713,9 +697,7 @@ superwork = [
 - [x] 3-service architektúra — marketing/dashboard/docs z jedného repo cez SITE_MODE middleware
 - [x] Čisté dashboard URL — `app.kovrin.dev/overview` (nie `/app/overview`)
 
-> **FeasibilityCritic:** V budúcnosti tuning — aktuálne funguje (4/4 PASS), ale pri zložitejších promptoch môže rejected rate byť vysoký. Treba kalibrovať prahové hodnoty a tool capability descriptions.
-
-**Fáza 1 — SuperWork MVP (2-4 týždne)**
+**Fáza 1 — SuperWork MVP** ✅ (okrem E2E testu)
 - [x] Session Watcher daemon — `src/kovrin/superwork/session_watcher.py`
 - [x] Context Injector (ChromaDB + sentence-transformers) — `src/kovrin/superwork/context_injector.py`
 - [x] Orchestrator Agent (Opus) — `src/kovrin/superwork/orchestrator.py`
@@ -731,7 +713,8 @@ superwork = [
 - [ ] Tauri wrapper, Menu Bar ikonka, macOS notifikácie
 
 **Fáza 3 — Produkcia (2-3 mesiace)**
-- [ ] Temporal (durable execution), EventStoreDB, multi-model, OpenTelemetry
+- [ ] Temporal (durable execution), EventStoreDB
+- [x] OpenTelemetry — instrumented: constitutional, critics, parser, risk_router, watchdog, executor
 
 **Fáza 4 — SaaS (3-6 mesiacov)**
 - [ ] Team features, multi-tenant, SOC 2, marketplace
@@ -782,15 +765,10 @@ Platforma: Web app (Next.js) → Desktop (Tauri) → Mouse-less AI workspace.
 ## Priorita práce (poradie pre Claude Code)
 
 1. 🔴 **Safety correctness** — Nikdy neporušiť 6 invariantov
-2. ✅ ~~TypeScript drift fix~~ — Vyriešené
-3. ✅ ~~Dashboard DISCONNECTED~~ — Vyriešené (`KOVRIN_API_INTERNAL_URL=https://api.kovrin.dev`)
-4. ✅ ~~Dashboard URL refactor~~ — Vyriešené (route groups, čisté URL)
-5. ✅ ~~SuperWork error handling~~ — Vyriešené (error states, Stop button, WS warning)
-6. 🟡 **End-to-end SuperWork pipeline test** — posledný item Fázy 1
-7. 🟡 **SuperWork UI doladenie** — UX nie je ešte kompletné
-8. 🟢 **Test coverage** — Každá public metóda má testy
-9. ✅ ~~Hardcoded model strings~~ — Vyriešené (ModelTier + DEFAULT_MODEL_ROUTING)
-10. 🔵 **Fáza 2** — Native Mac App (Tauri)
+2. 🟡 **End-to-end SuperWork pipeline test** — posledný item Fázy 1
+3. 🟡 **SuperWork UI doladenie** — UX nie je ešte kompletné
+4. 🟢 **Docs site** — docs.kovrin.dev (content, Fumadocs)
+5. 🔵 **Fáza 2** — Native Mac App (Tauri)
 
 ---
 

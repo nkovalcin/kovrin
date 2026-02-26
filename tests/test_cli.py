@@ -155,3 +155,91 @@ class TestCLIImports:
         from kovrin.cli import _shell
 
         assert callable(_shell)
+
+
+class TestCLISubcommandHelp:
+    """All subcommands should have --help."""
+
+    def test_shell_help(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "shell", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+
+    def test_audit_help(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "audit", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+
+    def test_verify_help(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "verify", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+
+    def test_status_help(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "status", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+
+
+class TestCLIOutputFormat:
+    """Verify CLI output contains expected structured content."""
+
+    def test_status_shows_tools(self):
+        """Status should show tool information."""
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+        # Status should show framework info
+        assert "Kovrin" in result.stdout
+
+    def test_verify_exits_zero(self):
+        """Verify with clean state should exit 0."""
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "verify"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 0
+
+    def test_audit_with_fake_id(self):
+        """Audit with nonexistent intent_id should handle gracefully."""
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "audit", "nonexistent-intent-xyz"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # Should not crash
+        assert result.returncode in (0, 1)
+
+    def test_run_without_intent_fails(self):
+        """Run without intent argument should fail."""
+        result = subprocess.run(
+            [sys.executable, "-m", "kovrin.cli", "run"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        # argparse should error on missing required argument
+        assert result.returncode != 0
