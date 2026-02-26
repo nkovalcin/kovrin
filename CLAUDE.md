@@ -17,7 +17,7 @@
 **Stav:** Alpha — core + tools + providers + CLI + dashboard LIVE, **production-verified na Railway**
 **Licencia:** MIT
 **Deployment:** Railway (auto-deploy z `main`) — kovrin-api (FastAPI) + kovrin-web (Next.js, 3 služby)
-**Posledný verified test:** 2026-02-26 — 978 tests PASS, full stack LIVE (dashboard CONNECTED, API healthy, WS active)
+**Posledný verified test:** 2026-02-26 — 1008 tests PASS, full stack LIVE (dashboard CONNECTED, API healthy, WS active)
 **CLAUDE.md stratégia:** Tento súbor je **jediný globálny CLAUDE.md** pre oba repozitáre (kovrin + kovrin-web). V kovrin-web/ je len pointer sem.
 
 ---
@@ -45,7 +45,7 @@ Framework kde bezpečnosť AI agentov nie je runtime filter, ale **architektonic
 | Metrika | Hodnota |
 |---------|---------|
 | Fázy whitepaperu | 6/6 implementovaných (Phase 7 neexistuje) |
-| Testy | **978** (z toho 42 adversarial, 84 E2E, 60 test súborov) |
+| Testy | **1008** (z toho 42 adversarial, 116 E2E, 61 test súborov) |
 | TLA+ špecifikácie | **8 modulov**, 10 safety invariantov |
 | Pydantic modely | **53 modelov, 22 enumov** (29/13 v core, zvyšok v tools/providers/intent/superwork/observability) |
 | Dashboard komponenty | **16** (11 kovrin + 5 superwork, React/TypeScript) |
@@ -569,7 +569,7 @@ curl -X POST https://api.kovrin.dev/api/run \
 |---------|----------|---------|
 | SQLite v produkcii | 🟡 Stredná | Pre produkciu → Temporal/EventStoreDB/Kafka |
 | Pre-existing API tests | 🟡 Nízka | `test_api.py` + `test_superwork_api.py` vyžadujú bežiaci server. Skip cez `--ignore`. |
-| End-to-end SuperWork pipeline | 🟡 Stredná | Posledný item Fázy 1 — celý SuperWork flow ešte nebol testovaný end-to-end. |
+| End-to-end SuperWork pipeline | ✅ Vyriešené | 32 E2E testov — API endpoints, manager flow, safety invarianty, WebSocket broadcast. |
 | FeasibilityCritic tuning | 🟢 Nízka | Funguje (4/4 PASS), ale pri zložitejších promptoch môže rejected rate byť vysoký. |
 
 ---
@@ -697,7 +697,7 @@ superwork = [
 - [x] 3-service architektúra — marketing/dashboard/docs z jedného repo cez SITE_MODE middleware
 - [x] Čisté dashboard URL — `app.kovrin.dev/overview` (nie `/app/overview`)
 
-**Fáza 1 — SuperWork MVP** ✅ (okrem E2E testu)
+**Fáza 1 — SuperWork MVP** ✅ KOMPLETNÁ (2026-02-26)
 - [x] Session Watcher daemon — `src/kovrin/superwork/session_watcher.py`
 - [x] Context Injector (ChromaDB + sentence-transformers) — `src/kovrin/superwork/context_injector.py`
 - [x] Orchestrator Agent (Opus) — `src/kovrin/superwork/orchestrator.py`
@@ -707,7 +707,7 @@ superwork = [
 - [x] `kovrin superwork` CLI — `src/kovrin/superwork/cli.py`
 - [x] Web Supervisor Dashboard (kovrin-web) — overview, proposals, feed, approvals
 - [x] Dashboard v kovrin repo (Vite, starý prototyp) — 5 SuperWork komponentov
-- [ ] End-to-end testovanie SuperWork pipeline
+- [x] End-to-end testovanie SuperWork pipeline — 32 testov (API, manager flow, safety, WebSocket)
 
 **Fáza 2 — Native Mac App (4-8 týždne)**
 - [ ] Tauri wrapper, Menu Bar ikonka, macOS notifikácie
@@ -765,10 +765,9 @@ Platforma: Web app (Next.js) → Desktop (Tauri) → Mouse-less AI workspace.
 ## Priorita práce (poradie pre Claude Code)
 
 1. 🔴 **Safety correctness** — Nikdy neporušiť 6 invariantov
-2. 🟡 **End-to-end SuperWork pipeline test** — posledný item Fázy 1
-3. 🟡 **SuperWork UI doladenie** — UX nie je ešte kompletné
-4. 🟢 **Docs site** — docs.kovrin.dev (content, Fumadocs)
-5. 🔵 **Fáza 2** — Native Mac App (Tauri)
+2. 🟡 **SuperWork UI doladenie** — UX nie je ešte kompletné
+3. 🟢 **Docs site** — docs.kovrin.dev (content, Fumadocs)
+4. 🔵 **Fáza 2** — Native Mac App (Tauri)
 
 ---
 
