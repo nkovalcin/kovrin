@@ -131,6 +131,7 @@ class Kovrin:
         topology: bool = False,
         tools: bool = False,
         model_routing: dict[str, str] | None = None,
+        repo: "PipelineRepository | None" = None,
     ):
         """Initialize Kovrin.
 
@@ -205,6 +206,7 @@ class Kovrin:
             tool_registry=self._tool_registry,
             tool_router=self._tool_router,
             model=self._model_routing.get("task_executor"),
+            repo=repo,
         )
         self._graph_executor = GraphExecutor(max_concurrent)
         self._safety_critic = SafetyCritic(self._constitutional)

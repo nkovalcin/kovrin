@@ -11,9 +11,12 @@ Usage:
 
 import asyncio
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import UTC
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -79,6 +82,7 @@ class PipelineManager:
     def __init__(self, db_url: str | None = None):
         self._running: dict[str, asyncio.Task] = {}
         self._results: dict[str, ExecutionResult] = {}
+        self._intents: dict[str, str] = {}  # intent_id → original intent text
         self._ws_connections: list[WebSocket] = []
 
         # Approval queue: key = "{intent_id}:{task_id}" -> Future[bool]
@@ -98,11 +102,8 @@ class PipelineManager:
             tools=True,
             approval_callback=self._handle_approval,
             autonomy_settings=self._autonomy_settings,
+            repo=self._repo,
         )
-
-        # Wire executor to repository for cost tracking
-        if hasattr(self._kovrin, "_executor"):
-            self._kovrin._executor._repo = self._repo
 
     def update_autonomy_settings(self, settings: AutonomySettings) -> None:
         """Update autonomy settings: memory + Kovrin + DB + broadcast."""
@@ -240,6 +241,7 @@ class PipelineManager:
             except ImportError:
                 pass  # Fall back to direct execution
 
+        self._intents[intent_id] = request.intent
         task = asyncio.create_task(self._run(intent_id, request))
         self._running[intent_id] = task
         return intent_id
@@ -319,8 +321,8 @@ class PipelineManager:
                 context=request.context,
                 hashed_traces=hashed_trace_data if hashed_trace_data else None,
             )
-        except Exception:
-            pass  # Persistence errors should not break the pipeline
+        except Exception as e:
+            logger.error("Failed to persist pipeline %s: %s", intent_id, e)
 
         await self._broadcast(
             {
@@ -524,12 +526,37 @@ async def get_result(intent_id: str) -> dict:
 
 @app.get("/api/pipelines")
 async def list_pipelines(limit: int = 50, offset: int = 0) -> dict:
-    """List all pipeline runs from persistent storage."""
+    """List all pipeline runs (DB + in-memory fallback)."""
     m = _require_manager()
     try:
         pipelines = m._repo.list_pipelines(limit=limit, offset=offset)
-        return {"pipelines": pipelines, "total": m._repo.pipeline_count}
-    except Exception:
+        db_ids = {p["intent_id"] for p in pipelines}
+
+        # Include in-memory results not yet persisted to DB
+        for iid, result in m._results.items():
+            if iid not in db_ids:
+                pipelines.append({
+                    "intent_id": iid,
+                    "intent": m._intents.get(iid, result.output[:80] if result.output else ""),
+                    "status": "completed",
+                    "success": result.success,
+                    "created_at": None,
+                    "completed_at": None,
+                })
+
+        # Sort: running first, then newest
+        pipelines.sort(
+            key=lambda p: (
+                0 if p.get("status") == "running" else 1,
+                p.get("completed_at") or p.get("created_at") or "",
+            ),
+            reverse=False,
+        )
+
+        total = m._repo.pipeline_count + len(m._results) - len(db_ids & set(m._results.keys()))
+        return {"pipelines": pipelines[:limit], "total": total}
+    except Exception as e:
+        logger.error("list_pipelines error: %s", e)
         return {"pipelines": [], "total": 0}
 
 
