@@ -125,7 +125,7 @@ Every task is scored for risk and routed through a configurable matrix:
 
 ```python
 from kovrin import Kovrin, AutonomySettings
-from kovrin.core.models import AutonomyProfile
+from kovrin.core.models import AutonomyProfile  # or: from kovrin import AutonomyProfile
 
 engine = Kovrin(
     autonomy_settings=AutonomySettings(profile=AutonomyProfile.CAUTIOUS)
@@ -143,7 +143,8 @@ from kovrin import ImmutableTraceLog
 
 log = ImmutableTraceLog()
 # ... after execution ...
-assert log.verify_integrity()  # True if no tampering
+valid, message = log.verify_integrity()
+assert valid  # True if no tampering
 ```
 
 ### Safety-Gated Tools
@@ -226,27 +227,27 @@ src/kovrin/
   agents/         # Agent coordinator, registry
   tools/          # 8 safety-gated tools (web search, code analysis, etc.)
   providers/      # Multi-model (Claude, OpenAI, Ollama) + circuit breaker
-  api/            # FastAPI server (REST + WebSocket + SSE)
+  api/            # FastAPI server (REST + WebSocket)
   schema/         # JSON Schema + TypeScript exporter
   storage/        # SQLite persistence
 
 specs/            # TLA+ formal verification (8 modules)
-dashboard/        # React/TypeScript dashboard (12 components)
-tests/            # 741 tests (unit + adversarial + integration)
+dashboard/        # React/TypeScript dashboard (16 components)
+tests/            # 1,100+ tests (unit + adversarial + E2E + integration)
 ```
 
 ## Testing
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -v                       # All 741 tests
+pytest tests/ -v                       # All tests
 pytest -m adversarial -v               # 42 adversarial attack tests
 pytest -m "not integration"            # Without API calls
 ```
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions!
 
 ```bash
 git clone https://github.com/nkovalcin/kovrin.git
@@ -262,7 +263,7 @@ MIT — see [LICENSE](LICENSE) for details.
 ## Links
 
 - **Website**: [kovrin.dev](https://kovrin.dev)
-- **Documentation**: [kovrin.dev/docs](https://kovrin.dev/docs/getting-started)
+- **Documentation**: [docs.kovrin.dev](https://docs.kovrin.dev/getting-started)
 - **GitHub**: [github.com/nkovalcin/kovrin](https://github.com/nkovalcin/kovrin)
 
 ---
