@@ -127,3 +127,25 @@ class PipelineError(KovrinError):
             details={"intent_id": intent_id, **(details or {})},
         )
         self.intent_id = intent_id
+
+
+class ChainError(PipelineError):
+    """Raised for session chain orchestration errors.
+
+    Includes chain_id and step_index for debugging which step failed.
+    """
+
+    def __init__(
+        self,
+        chain_id: str,
+        step_index: int,
+        message: str,
+        details: dict | None = None,
+    ):
+        super().__init__(
+            intent_id=chain_id,
+            message=f"Step {step_index}: {message}",
+            details={"chain_id": chain_id, "step_index": step_index, **(details or {})},
+        )
+        self.chain_id = chain_id
+        self.step_index = step_index

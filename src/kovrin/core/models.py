@@ -490,3 +490,105 @@ class TopologyRecommendation(BaseModel):
     confidence: float = Field(0.5, ge=0.0, le=1.0)
     reasoning: str = ""
     graph_metrics: dict = Field(default_factory=dict)
+
+
+# ─── Phase 7: Session Chaining & Multi-Agent Teams ──────
+
+
+class ChainErrorStrategy(str, Enum):
+    """How a SessionChain handles step failures."""
+
+    STOP_ON_FIRST = "STOP_ON_FIRST"
+    SKIP_FAILED = "SKIP_FAILED"
+    RETRY = "RETRY"
+
+
+class ChainStepStatus(str, Enum):
+    """Status of a single step in a chain."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
+class ChainStep(BaseModel):
+    """Definition of a single step in a SessionChain.
+
+    Each step holds an intent string that will be executed as a full
+    Kovrin pipeline run.  When ``inject_previous`` is True (default),
+    the previous step's output is automatically injected into this
+    step's context under the key ``previous_step_output``.
+
+    Template variables like ``{step_0.output}`` in the intent string
+    are resolved at runtime with actual outputs from earlier steps.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str = Field(default_factory=lambda: f"step-{uuid.uuid4().hex[:8]}")
+    intent: str
+    constraints: list[str] = Field(default_factory=list)
+    context: dict = Field(default_factory=dict)
+    inject_previous: bool = True
+    template_vars: dict[str, str] = Field(default_factory=dict)
+
+
+class ChainStepResult(BaseModel):
+    """Result of executing a single chain step."""
+
+    step_id: str
+    step_index: int
+    status: ChainStepStatus = ChainStepStatus.PENDING
+    execution_result: ExecutionResult | None = None
+    error: str | None = None
+    duration_ms: float = 0.0
+    cost_usd: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
+class ChainResult(BaseModel):
+    """Aggregate result of a full SessionChain execution."""
+
+    chain_id: str
+    steps: list[ChainStepResult] = Field(default_factory=list)
+    success: bool = True
+    total_duration_ms: float = 0.0
+    total_cost_usd: float = 0.0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    final_output: str = ""
+
+
+class TeamExecutionPattern(str, Enum):
+    """How agents in a team execute their work."""
+
+    PARALLEL = "PARALLEL"
+    SEQUENTIAL = "SEQUENTIAL"
+    DEBATE = "DEBATE"
+
+
+class TeamRole(BaseModel):
+    """A role definition within an AgentTeam."""
+
+    model_config = ConfigDict(frozen=True)
+
+    agent_role: AgentRole
+    task_description: str
+    custom_prompt: str | None = None
+
+
+class TeamResult(BaseModel):
+    """Result of a multi-agent team execution."""
+
+    team_id: str
+    pattern: TeamExecutionPattern
+    agent_outputs: dict[str, str] = Field(default_factory=dict)
+    synthesized_output: str = ""
+    debate_rounds: int = 0
+    total_cost_usd: float = 0.0
+    total_tokens: int = 0
+    traces: list[Trace] = Field(default_factory=list)
+    success: bool = True

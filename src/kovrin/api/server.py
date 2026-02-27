@@ -1004,6 +1004,101 @@ async def get_drift_metrics() -> dict:
     }
 
 
+# ─── Session Chaining & Multi-Agent Teams ────────────────────
+
+
+class ChainStepRequest(BaseModel):
+    """A single step in a chain run request."""
+
+    intent: str
+    constraints: list[str] = Field(default_factory=list)
+    context: dict = Field(default_factory=dict)
+    inject_previous: bool = True
+
+
+class ChainRunRequest(BaseModel):
+    """Request body for running a session chain."""
+
+    steps: list[ChainStepRequest]
+    error_strategy: str = "STOP_ON_FIRST"
+    max_retries: int = 2
+
+
+class TeamRunRequest(BaseModel):
+    """Request body for running with a multi-agent team."""
+
+    intent: str
+    roles: list[dict]  # Each: {"agent_role": "RESEARCHER", "task_description": "...", "custom_prompt": "..."}
+    pattern: str = "PARALLEL"
+    constraints: list[str] = Field(default_factory=list)
+    context: dict = Field(default_factory=dict)
+    max_debate_rounds: int = 3
+
+
+@app.post("/api/chain")
+async def run_chain(request: ChainRunRequest) -> dict:
+    """Execute a sequential chain of pipeline runs."""
+    from kovrin.core.models import ChainErrorStrategy, ChainStep
+
+    m = _require_manager()
+    steps = [
+        ChainStep(
+            intent=s.intent,
+            constraints=s.constraints,
+            context=s.context,
+            inject_previous=s.inject_previous,
+        )
+        for s in request.steps
+    ]
+    try:
+        strategy = ChainErrorStrategy(request.error_strategy)
+    except ValueError:
+        strategy = ChainErrorStrategy.STOP_ON_FIRST
+
+    result = await m._kovrin.run_chain(
+        steps=steps,
+        error_strategy=strategy,
+        max_retries=request.max_retries,
+    )
+    return result.model_dump(mode="json")
+
+
+@app.post("/api/team")
+async def run_team(request: TeamRunRequest) -> dict:
+    """Execute a pipeline with multi-agent team collaboration."""
+    from kovrin.core.models import AgentRole, TeamExecutionPattern, TeamRole
+
+    m = _require_manager()
+    roles = []
+    for r in request.roles:
+        try:
+            role = AgentRole(r["agent_role"])
+        except (ValueError, KeyError):
+            role = AgentRole.SPECIALIST
+        roles.append(
+            TeamRole(
+                agent_role=role,
+                task_description=r.get("task_description", "Execute the task"),
+                custom_prompt=r.get("custom_prompt"),
+            )
+        )
+
+    try:
+        pattern = TeamExecutionPattern(request.pattern)
+    except ValueError:
+        pattern = TeamExecutionPattern.PARALLEL
+
+    result = await m._kovrin.run_with_team(
+        intent=request.intent,
+        roles=roles,
+        pattern=pattern,
+        constraints=request.constraints or None,
+        context=request.context or None,
+        max_debate_rounds=request.max_debate_rounds,
+    )
+    return result.model_dump(mode="json")
+
+
 # ─── WebSocket ───────────────────────────────────────────────
 
 

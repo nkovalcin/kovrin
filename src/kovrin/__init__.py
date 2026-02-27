@@ -28,12 +28,19 @@ from kovrin.audit.trace_logger import ImmutableTraceLog
 from kovrin.core.constitutional import ConstitutionalCore
 from kovrin.core.models import (
     AutonomySettings,
+    ChainErrorStrategy,
+    ChainResult,
+    ChainStep,
+    ChainStepResult,
     DEFAULT_MODEL_ROUTING,
     ExecutionResult,
     ExplorationResult,
     ModelTier,
     SubTask,
     TaskStatus,
+    TeamExecutionPattern,
+    TeamResult,
+    TeamRole,
     Trace,
 )
 from kovrin.engine.executor import TaskExecutor
@@ -80,6 +87,15 @@ __all__ = [
     # Agents
     "AgentCoordinator",
     "AgentRegistry",
+    # Session Chaining
+    "ChainErrorStrategy",
+    "ChainResult",
+    "ChainStep",
+    "ChainStepResult",
+    # Multi-Agent Teams
+    "TeamExecutionPattern",
+    "TeamResult",
+    "TeamRole",
 ]
 
 
@@ -251,6 +267,9 @@ class Kovrin:
         self._mcts = None
         self._beam_executor = None
         self._confidence = None
+
+        # Team mode (set dynamically by run_with_team)
+        self._team = None
 
         if explore:
             from kovrin.engine.mcts import CriticBasedScorer, MCTSExplorer
@@ -494,7 +513,33 @@ class Kovrin:
             )
 
         # 5. Choose execution function
-        if self._agents_enabled and self._coordinator:
+        if self._team:
+            # Team mode: wrap AgentTeam.execute as GraphExecutor-compatible fn
+            _team_ref = self._team
+
+            async def _team_execute_fn(
+                subtask: SubTask, dep_results: dict[str, str]
+            ) -> str:
+                result = await _team_ref.execute(subtask, dep_results, trace_log)
+                return result.synthesized_output
+
+            execute_fn = _team_execute_fn
+            await trace_log.append_async(
+                Trace(
+                    intent_id=intent_obj.id,
+                    event_type="TEAM_MODE",
+                    description=(
+                        f"Team '{_team_ref._name}' ({_team_ref._pattern.value}) "
+                        f"with {len(_team_ref._roles)} roles"
+                    ),
+                    details={
+                        "team_id": _team_ref.team_id,
+                        "pattern": _team_ref._pattern.value,
+                        "roles": [r.agent_role.value for r in _team_ref._roles],
+                    },
+                )
+            )
+        elif self._agents_enabled and self._coordinator:
             execute_fn = self._coordinator.execute_with_agent
             await trace_log.append_async(
                 Trace(
@@ -583,6 +628,85 @@ class Kovrin:
             graph_summary=graph.to_dict(),
             exploration=exploration_info,
         )
+
+    async def run_chain(
+        self,
+        steps: list[ChainStep],
+        error_strategy: ChainErrorStrategy = ChainErrorStrategy.STOP_ON_FIRST,
+        max_retries: int = 2,
+    ) -> ChainResult:
+        """Execute a sequential chain of pipeline runs.
+
+        Each step's output feeds into the next step's context.
+        Template variables like ``{step_0.output}`` are resolved at runtime.
+
+        Args:
+            steps: Ordered list of chain steps.
+            error_strategy: How to handle step failures.
+            max_retries: Max retries per step (only used with RETRY strategy).
+
+        Returns:
+            Aggregate chain result with per-step details.
+        """
+        from kovrin.engine.chain import SessionChain
+
+        chain = SessionChain(
+            engine=self,
+            steps=steps,
+            error_strategy=error_strategy,
+            max_retries=max_retries,
+        )
+        return await chain.run()
+
+    async def run_with_team(
+        self,
+        intent: str,
+        roles: list[TeamRole],
+        pattern: TeamExecutionPattern = TeamExecutionPattern.PARALLEL,
+        constraints: list[str] | None = None,
+        context: dict | None = None,
+        max_debate_rounds: int = 3,
+    ) -> ExecutionResult:
+        """Execute a pipeline with multi-agent team collaboration.
+
+        Creates an AgentTeam and uses it as the execution function in
+        the standard pipeline.  All safety invariants remain enforced.
+
+        Args:
+            intent: The user's intent description.
+            roles: List of team roles (agent_role + task_description).
+            pattern: Execution pattern (PARALLEL, SEQUENTIAL, DEBATE).
+            constraints: Optional constraints for the pipeline.
+            context: Optional context dict.
+            max_debate_rounds: Max debate rounds (only used with DEBATE pattern).
+
+        Returns:
+            Standard ExecutionResult with team-synthesized outputs.
+        """
+        from kovrin.agents.team import AgentTeam
+
+        team = AgentTeam(
+            name=f"team-{intent[:20]}",
+            roles=roles,
+            pattern=pattern,
+            registry=self._registry,
+            coordinator=self._coordinator,
+            client=self._client,
+            max_debate_rounds=max_debate_rounds,
+        )
+
+        # Override execution function for this run
+        original_agents = self._agents_enabled
+        original_coordinator = self._coordinator
+        self._agents_enabled = True
+        self._team = team
+
+        try:
+            return await self.run(intent, constraints, context)
+        finally:
+            self._agents_enabled = original_agents
+            self._coordinator = original_coordinator
+            self._team = None
 
     def run_sync(
         self,
